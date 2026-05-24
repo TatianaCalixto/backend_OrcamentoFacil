@@ -18,6 +18,7 @@ if str(BACKEND_DIR) not in sys.path:
 # Import dos models para registrar nas metadata do Base.
 # Adicionar novos modulos abaixo conforme forem criados.
 from app.accounts import models as _accounts_models  # noqa: E402, F401
+from app.budgets import models as _budgets_models  # noqa: E402, F401
 from app.categories import models as _categories_models  # noqa: E402, F401
 from app.core.config import get_settings  # noqa: E402
 from app.database.base import Base  # noqa: E402
