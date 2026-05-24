@@ -19,6 +19,7 @@ from app.categories.router import router as categories_router
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
+from app.transactions.router import router as transactions_router
 from app.users.router import router as users_router
 
 _settings = get_settings()
@@ -44,6 +45,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(accounts_router)
 app.include_router(categories_router)
+app.include_router(transactions_router)
 
 
 @app.get("/health")

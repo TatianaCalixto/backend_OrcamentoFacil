@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.accounts.models import Account
 from app.categories.models import Category
 from app.transactions.models import Transaction, TransactionType
-from app.transactions.repository import TransactionRepository
+from app.transactions.repository import TransactionFilters, TransactionRepository
 from app.transactions.schemas import TransactionCreate, TransactionUpdate
 
 
@@ -46,6 +46,18 @@ class TransactionService:
 
     def list_for_user(self, user_id: int) -> list[Transaction]:
         return self.repo.list_by_user(user_id)
+
+    def list_paginated(
+        self,
+        user_id: int,
+        filters: TransactionFilters,
+        page: int,
+        page_size: int,
+        order_by: str = "-date",
+    ) -> tuple[list[Transaction], int]:
+        items = self.repo.list_paginated(user_id, filters, page, page_size, order_by)
+        total = self.repo.count(user_id, filters)
+        return items, total
 
     # ------------------ ownership ------------------
 
