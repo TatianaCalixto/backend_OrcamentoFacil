@@ -2,7 +2,7 @@
 
 
 def test_smoke_assert_true() -> None:
-    assert True
+    assert False, "intencional: validacao CI vermelha (S00-T05)"
 
 
 def test_smoke_python_version_minima() -> None:
