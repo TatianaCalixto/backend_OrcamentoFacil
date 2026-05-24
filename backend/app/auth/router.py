@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token
 from app.auth.security import hash_password, verify_password
+from app.categories.seed import seed_default_categories
 from app.database.session import get_db
 from app.users.models import User
 from app.users.schemas import LoginRequest, TokenResponse, UserCreate, UserRead
@@ -35,6 +36,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     db.add(user)
     db.commit()
     db.refresh(user)
+    seed_default_categories(db, user.id)
     return user
 
 
