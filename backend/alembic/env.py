@@ -18,6 +18,10 @@ if str(BACKEND_DIR) not in sys.path:
 from app.core.config import get_settings  # noqa: E402
 from app.database.base import Base  # noqa: E402
 
+# Import dos models para registrar nas metadata do Base.
+# Adicionar novos modulos abaixo conforme forem criados.
+from app.users import models as _users_models  # noqa: E402, F401
+
 # Alembic Config object
 config = context.config
 
