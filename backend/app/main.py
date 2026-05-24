@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.accounts.router import router as accounts_router
 from app.auth.router import router as auth_router
+from app.categories.router import router as categories_router
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
@@ -42,6 +43,7 @@ register_error_handlers(app)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(accounts_router)
+app.include_router(categories_router)
 
 
 @app.get("/health")
