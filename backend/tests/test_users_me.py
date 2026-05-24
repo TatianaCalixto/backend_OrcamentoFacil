@@ -69,3 +69,30 @@ def test_me_com_scheme_errado_retorna_401(scheme: str) -> None:
     _, token = _register_and_login()
     r = client.get("/users/me", headers={"Authorization": f"{scheme} {token}"})
     assert r.status_code == 401
+
+
+def test_me_com_token_sem_sub_numerico_retorna_401() -> None:
+    """Cobre a guarda contra payload['sub'] ausente/nao numerico em get_current_user."""
+    # cria um token "valido" mas com sub nao numerico via override no payload
+    from datetime import UTC, datetime, timedelta
+
+    from jose import jwt as jose_jwt
+
+    from app.auth.jwt import create_access_token
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    now = datetime.now(UTC)
+    forged = jose_jwt.encode(
+        {
+            "sub": "abc",  # nao e digito
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+    r = client.get("/users/me", headers={"Authorization": f"Bearer {forged}"})
+    assert r.status_code == 401
+    # sanity: token bem-formado (so para reforcar que o 401 veio da guarda do sub)
+    assert create_access_token(1)  # nao levanta
