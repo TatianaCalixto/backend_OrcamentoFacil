@@ -44,10 +44,13 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         exc.detail,
         extra={"request_id": rid},
     )
+    headers: dict[str, str] = {REQUEST_ID_HEADER: rid}
+    if exc.headers:
+        headers.update(exc.headers)
     return JSONResponse(
         status_code=exc.status_code,
         content=_payload(exc.detail, f"http_{exc.status_code}", rid),
-        headers={REQUEST_ID_HEADER: rid},
+        headers=headers,
     )
 
 

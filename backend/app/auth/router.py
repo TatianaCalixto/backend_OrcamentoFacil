@@ -6,10 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.security import hash_password
+from app.auth.jwt import create_access_token
+from app.auth.security import hash_password, verify_password
 from app.database.session import get_db
 from app.users.models import User
-from app.users.schemas import UserCreate, UserRead
+from app.users.schemas import LoginRequest, TokenResponse, UserCreate, UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -35,3 +36,16 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="credenciais invalidas",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token)
