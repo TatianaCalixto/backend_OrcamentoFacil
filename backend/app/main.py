@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.auth.router import router as auth_router
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
@@ -35,6 +36,8 @@ app.add_middleware(
 )
 
 register_error_handlers(app)
+
+app.include_router(auth_router)
 
 
 @app.get("/health")
