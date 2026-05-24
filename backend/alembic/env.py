@@ -15,11 +15,11 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.core.config import get_settings  # noqa: E402
-from app.database.base import Base  # noqa: E402
-
 # Import dos models para registrar nas metadata do Base.
 # Adicionar novos modulos abaixo conforme forem criados.
+from app.accounts import models as _accounts_models  # noqa: E402, F401
+from app.core.config import get_settings  # noqa: E402
+from app.database.base import Base  # noqa: E402
 from app.users import models as _users_models  # noqa: E402, F401
 
 # Alembic Config object

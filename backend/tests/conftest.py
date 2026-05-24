@@ -16,11 +16,11 @@ os.environ.setdefault("ENVIRONMENT", "test")
 
 import pytest  # noqa: E402
 
-from app.database.base import Base  # noqa: E402
-from app.database.session import engine  # noqa: E402
-
 # Import dos modelos para registrar em Base.metadata.
 # Cada novo modulo de modelo deve ser adicionado aqui.
+from app.accounts import models as _accounts_models  # noqa: E402, F401
+from app.database.base import Base  # noqa: E402
+from app.database.session import engine  # noqa: E402
 from app.users import models as _users_models  # noqa: E402, F401
 
 

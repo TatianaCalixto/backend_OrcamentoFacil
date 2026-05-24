@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -22,6 +22,18 @@ if _settings.database_url.startswith("sqlite"):
         _engine_kwargs["poolclass"] = StaticPool
 
 engine: Engine = create_engine(_settings.database_url, **_engine_kwargs)
+
+
+# sqlite nao impoe foreign keys por padrao; ligar pragma em cada conexao
+# para que testes pegam violacoes de FK do mesmo jeito que Postgres pegaria.
+if engine.dialect.name == "sqlite":
+
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_fk(dbapi_conn, _conn_record) -> None:  # noqa: ANN001
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
+
 
 SessionLocal = sessionmaker(
     bind=engine,
