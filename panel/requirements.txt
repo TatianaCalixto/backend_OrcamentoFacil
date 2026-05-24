@@ -1,0 +1,8 @@
+# OrçaFácil — Painel Web Streamlit (Sprint 15)
+# Python 3.12+ obrigatório.
+
+streamlit>=1.36
+requests>=2.32
+pandas>=2.2
+plotly>=5.22
+openpyxl>=3.1  # exportação XLSX
