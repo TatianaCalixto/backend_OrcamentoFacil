@@ -1,20 +1,24 @@
 """Aplicacao FastAPI do OrcaFacil.
 
-S01-T01 entrega a estrutura base: instancia FastAPI, CORS, exception
-handler global minimo e endpoint /health. O handler sera enriquecido em
-S01-T05 (logging estruturado + payload padronizado com request_id).
+S01-T01 entregou a estrutura base. S01-T05 acopla logging estruturado,
+middleware de request_id e exception handlers padronizados (HTTPException,
+RequestValidationError e Exception generica).
 """
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app import __version__
+from app.core.config import get_settings
+from app.core.errors import register_error_handlers
+from app.core.logging import configure_logging
 
+_settings = get_settings()
+configure_logging(_settings.environment)
 logger = logging.getLogger("orcafacil")
 
 app = FastAPI(
@@ -30,14 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("unhandled exception on %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error"},
-    )
+register_error_handlers(app)
 
 
 @app.get("/health")
