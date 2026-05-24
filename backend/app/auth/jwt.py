@@ -1,17 +1,38 @@
-"""Emissao e verificacao de JWT (S02-T03)."""
+"""Emissao e verificacao de JWT (S02-T03; refresh em S10-T03)."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from jose import JWTError, jwt
 
 from app.core.config import get_settings
 
+TokenKind = Literal["access", "refresh"]
+
 
 class TokenError(Exception):
     """Erro generico de token (expirado, assinatura invalida, etc.)."""
+
+
+def _encode(
+    user_id: int,
+    kind: TokenKind,
+    delta: timedelta,
+    extra_claims: dict[str, Any] | None = None,
+) -> str:
+    settings = get_settings()
+    now = datetime.now(UTC)
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "iat": int(now.timestamp()),
+        "exp": int((now + delta).timestamp()),
+        "typ": kind,
+    }
+    if extra_claims:
+        payload.update(extra_claims)
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def create_access_token(
@@ -20,21 +41,34 @@ def create_access_token(
     extra_claims: dict[str, Any] | None = None,
 ) -> str:
     settings = get_settings()
-    delta = expires or timedelta(minutes=settings.jwt_expire_minutes)
-    now = datetime.now(UTC)
-    payload: dict[str, Any] = {
-        "sub": str(user_id),
-        "iat": int(now.timestamp()),
-        "exp": int((now + delta).timestamp()),
-    }
-    if extra_claims:
-        payload.update(extra_claims)
-    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return _encode(
+        user_id,
+        "access",
+        expires or timedelta(minutes=settings.jwt_expire_minutes),
+        extra_claims,
+    )
 
 
-def decode_token(token: str) -> dict[str, Any]:
+def create_refresh_token(
+    user_id: int,
+    expires: timedelta | None = None,
+) -> str:
+    settings = get_settings()
+    return _encode(
+        user_id,
+        "refresh",
+        expires or timedelta(minutes=settings.jwt_refresh_expire_minutes),
+    )
+
+
+def decode_token(token: str, *, expected_typ: TokenKind | None = None) -> dict[str, Any]:
+    """Decoda e (opcionalmente) valida que o claim 'typ' bate."""
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError as e:
         raise TokenError(str(e)) from e
+
+    if expected_typ is not None and payload.get("typ") != expected_typ:
+        raise TokenError(f"esperado typ={expected_typ}, recebido {payload.get('typ')!r}")
+    return payload

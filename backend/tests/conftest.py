@@ -34,3 +34,14 @@ def _setup_schema():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """Limpa o storage do slowapi entre testes; tests que querem testar
+    429 podem usar a fixture rate_limit_active para reabilitar."""
+    from app.core.ratelimit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()

@@ -1,17 +1,30 @@
-"""Rotas de autenticacao (S02-T04 register; S02-T05 login)."""
+"""Rotas de autenticacao (S02-T04 register; S02-T05 login;
+S10-T02 rate limit; S10-T03 refresh)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.jwt import create_access_token
+from app.auth.jwt import (
+    TokenError,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+)
 from app.auth.security import hash_password, verify_password
 from app.categories.seed import seed_default_categories
+from app.core.ratelimit import limiter
 from app.database.session import get_db
 from app.users.models import User
-from app.users.schemas import LoginRequest, TokenResponse, UserCreate, UserRead
+from app.users.schemas import (
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserCreate,
+    UserRead,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -20,8 +33,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
+    summary="Cadastra um novo usuario",
+    description="Cria um usuario, faz seed automatico das 8 categorias padrao "
+    "e retorna o UserRead. Email duplicado retorna 409.",
 )
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+@limiter.limit("10/minute")
+def register(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+) -> User:
     existing = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(
@@ -40,8 +61,19 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> User:
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Autentica e devolve access + refresh tokens",
+    description="POST com email+password. Em sucesso retorna 200 com access_token e refresh_token. "
+    "Em falha retorna 401 com header WWW-Authenticate: Bearer.",
+)
+@limiter.limit("10/minute")
+def login(
+    request: Request,  # noqa: ARG001
+    payload: LoginRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
@@ -49,5 +81,36 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
             detail="credenciais invalidas",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
+    )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Emite novo par de tokens a partir de um refresh valido",
+    description="Recebe {refresh_token}. Se valido (typ=refresh, nao expirado, "
+    "assinatura ok, usuario ainda existe), retorna novo par; senao 401.",
+)
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    unauth = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="refresh token invalido",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        claims = decode_token(payload.refresh_token, expected_typ="refresh")
+    except TokenError as e:
+        raise unauth from e
+    sub = claims.get("sub")
+    if not sub or not str(sub).isdigit():
+        raise unauth
+    user = db.get(User, int(sub))
+    if user is None:
+        raise unauth
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
+    )

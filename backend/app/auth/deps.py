@@ -26,7 +26,12 @@ def get_current_user(
     if not token:
         raise _UNAUTH
     try:
+        # tokens antigos (S02-T03) nao tinham 'typ'; toleramos isso para nao
+        # quebrar tokens emitidos antes do refresh. Apos S10-T03, tokens
+        # marcados como refresh sao explicitamente rejeitados.
         payload = decode_token(token)
+        if payload.get("typ") == "refresh":
+            raise TokenError("refresh token nao pode ser usado como access")
     except TokenError as e:
         raise _UNAUTH from e
 
