@@ -23,6 +23,7 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.ratelimit import limiter, rate_limit_exceeded_handler
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.dashboard.router import router as dashboard_router
 from app.goals.router import router as goals_router
 from app.imports.router import router as imports_router
@@ -64,6 +65,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# headers de seguranca HTTP (S20-T04); HSTS apenas em producao
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    production=_settings.environment == "production",
 )
 
 register_error_handlers(app)
