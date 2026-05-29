@@ -9,10 +9,13 @@ ambiente, rate limiting, refresh token e polish do OpenAPI.
 from __future__ import annotations
 
 import logging
+import time
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app import __version__
 from app.accounts.router import router as accounts_router
@@ -25,6 +28,7 @@ from app.core.logging import configure_logging
 from app.core.ratelimit import limiter, rate_limit_exceeded_handler
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.dashboard.router import router as dashboard_router
+from app.database.session import get_db
 from app.goals.router import router as goals_router
 from app.imports.router import router as imports_router
 from app.transactions.router import router as transactions_router
@@ -93,3 +97,32 @@ app.include_router(imports_router)
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "version": __version__}
+
+
+# Momento de inicializacao do processo, para uptime do /healthz (S21-T04).
+_START_MONOTONIC = time.monotonic()
+
+
+@app.get(
+    "/healthz",
+    summary="Healthcheck profundo (app + banco)",
+    description="Distinto de /health: inclui versao, uptime e ping ao banco "
+    "(SELECT 1 + latencia). DB ok -> 200; DB indisponivel -> 503. Nao expoe "
+    "credenciais nem string de conexao.",
+)
+def healthz(response: Response, db: Session = Depends(get_db)) -> dict:
+    db_status = "up"
+    latency_ms: float | None = None
+    started = time.perf_counter()
+    try:
+        db.execute(text("SELECT 1"))
+        latency_ms = round((time.perf_counter() - started) * 1000, 2)
+    except Exception:
+        db_status = "down"
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return {
+        "status": "ok" if db_status == "up" else "degraded",
+        "version": __version__,
+        "uptime_seconds": round(time.monotonic() - _START_MONOTONIC, 1),
+        "database": {"status": db_status, "latency_ms": latency_ms},
+    }
