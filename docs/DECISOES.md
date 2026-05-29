@@ -18,7 +18,7 @@ Histórico de decisões não-óbvias tomadas durante a execução. Espelha a aba
 
 **Justificativa:** Painel Streamlit fica com backend por compartilhar stack Python e por consumir o mesmo banco/contexto. Mobile fica isolado por ter ciclo de release próprio (APK). docs/ e scripts/ ficam no backend repo (devops/python-centric).
 
-**Impacto:** Planilha de planejamento permanece em `d:\Projetos\OrcamentoFamiliar\` (workspace root), fora dos dois repos.
+**Impacto:** Planilha de planejamento permanece no workspace root (fora dos dois repos de código), pois é artefato operacional do ciclo de planejamento.
 
 ---
 

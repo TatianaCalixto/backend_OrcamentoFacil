@@ -9,6 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 import api
+from ui import render_header
 
 st.set_page_config(page_title="Relatorios — OrcaFacil", layout="wide")
 
@@ -21,6 +22,8 @@ def _require_auth() -> tuple[str, str]:
 
 
 token, api_base = _require_auth()
+
+render_header()
 
 st.title("Relatorios financeiros")
 

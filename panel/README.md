@@ -34,6 +34,7 @@ Abre em `http://localhost:8501`.
 - **Home (`app.py`)** — login (chama `POST /auth/login`), sessão guardada em `st.session_state`. Logout limpa estado.
 - **Relatórios (`pages/1_Relatorios.py`)** — resumo mensal, breakdown por categoria (pizza), fluxo de caixa (linha). Filtros de mês/ano e date range.
 - **Transações (`pages/2_Transacoes.py`)** — lista com filtros (data, conta, categoria, tipo, busca textual) e botões de **exportação CSV e XLSX**.
+- **Contas (`pages/3_Contas.py`)** — CRUD de contas (listar, criar, editar, excluir).
 
 ## Smoke test manual
 
@@ -42,6 +43,16 @@ Abre em `http://localhost:8501`.
 3. Adicionar uma conta e algumas transações.
 4. `streamlit run app.py`, fazer login, navegar pelas páginas.
 5. Exportar CSV/XLSX e abrir.
+
+### Smoke test manual — Contas
+
+1. Subir backend e fazer login no painel.
+2. Acessar a página **Contas** no menu lateral.
+3. Expandir **"+ Nova conta"**, preencher nome `Teste S17`, tipo `Corrente`, saldo inicial `0,00` e clicar **Criar**.
+4. Verificar que a conta `Teste S17` aparece na listagem após o rerun.
+5. Expandir **"Editar conta"**, selecionar `Teste S17`, alterar o nome para `Teste S17 editado` e clicar **Salvar**.
+6. Expandir **"Excluir conta"**, selecionar `Teste S17 editado`, marcar **Confirmo a exclusão** e clicar **Excluir**.
+7. Confirmar que a conta sumiu da listagem.
 
 ## Notas
 

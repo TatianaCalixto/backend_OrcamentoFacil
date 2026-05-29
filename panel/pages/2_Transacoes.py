@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 import pandas as pd
 import streamlit as st
 
 import api
+from ui import filter_categories_by_type, render_header
 
 st.set_page_config(page_title="Transacoes — OrcaFacil", layout="wide")
 
 if "token" not in st.session_state:
     st.warning("Faca login na pagina principal para acessar.")
     st.stop()
+
+render_header()
 
 token = st.session_state["token"]
 api_base = st.session_state.get("api_base", api.DEFAULT_BASE_URL)
@@ -141,3 +144,152 @@ with col_xlsx:
         file_name=f"transacoes_{date_from}_{date_to}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+# ----- editar transacao (S18-T02) -----
+
+PAYMENT_OPTIONS = ["", "cash", "debit", "credit", "pix", "transfer", "other"]
+PAYMENT_LABELS = {
+    "": "(nao informado)",
+    "cash": "Dinheiro",
+    "debit": "Debito",
+    "credit": "Credito",
+    "pix": "Pix",
+    "transfer": "Transferencia",
+    "other": "Outro",
+}
+
+
+def _tx_label(tx: dict) -> str:
+    return f"{tx['date']} | {tx.get('description') or '(sem descricao)'} | {tx['amount']}"
+
+
+tx_by_id = {t["id"]: t for t in items}
+
+st.subheader("Editar transacao")
+
+edit_id = st.selectbox(
+    "Transacao para editar",
+    options=list(tx_by_id.keys()),
+    format_func=lambda i: _tx_label(tx_by_id[i]),
+    key="edit_tx_select",
+)
+current = tx_by_id[edit_id]
+cur_type = current.get("type", "expense")
+ed_cats = filter_categories_by_type(categories, cur_type)
+if not ed_cats:
+    # fallback: usa todas as categorias se nenhuma do tipo for encontrada
+    ed_cats = list(categories)
+
+try:
+    cur_date = datetime.fromisoformat(current["date"]).date()
+except (TypeError, ValueError):
+    cur_date = date.today()
+
+cur_amount = float(current.get("amount", 0))
+cur_account_id = current.get("account_id")
+cur_category_id = current.get("category_id")
+cur_payment = current.get("payment_method") or ""
+cur_description = current.get("description") or ""
+cur_recurring = bool(current.get("is_recurring", False))
+
+with st.form("form_editar_transacao"):
+    ed_type = st.radio(
+        "Tipo",
+        options=["income", "expense"],
+        index=0 if cur_type == "income" else 1,
+        horizontal=True,
+        format_func=lambda v: "Receita" if v == "income" else "Despesa",
+    )
+    ed_amount = st.number_input(
+        "Valor",
+        min_value=0.0,
+        step=0.01,
+        format="%.2f",
+        value=cur_amount,
+    )
+    ed_date = st.date_input("Data", value=cur_date)
+    acc_options = [a["id"] for a in accounts]
+    try:
+        acc_idx = acc_options.index(cur_account_id)
+    except ValueError:
+        acc_idx = 0
+    ed_account = st.selectbox(
+        "Conta",
+        options=acc_options,
+        index=acc_idx,
+        format_func=lambda i: next(
+            (a["name"] for a in accounts if a["id"] == i), str(i)
+        ),
+    )
+    cat_options = [c["id"] for c in ed_cats]
+    try:
+        cat_idx = cat_options.index(cur_category_id)
+    except ValueError:
+        cat_idx = 0
+    ed_category = st.selectbox(
+        "Categoria",
+        options=cat_options,
+        index=cat_idx if cat_options else 0,
+        format_func=lambda i: next(
+            (c["name"] for c in ed_cats if c["id"] == i), str(i)
+        ),
+    )
+    ed_description = st.text_input("Descricao", value=cur_description)
+    try:
+        pay_idx = PAYMENT_OPTIONS.index(cur_payment)
+    except ValueError:
+        pay_idx = 0
+    ed_payment = st.selectbox(
+        "Forma de pagamento",
+        options=PAYMENT_OPTIONS,
+        index=pay_idx,
+        format_func=lambda v: PAYMENT_LABELS[v],
+    )
+    ed_recurring = st.checkbox("Recorrente", value=cur_recurring)
+    submit_edit = st.form_submit_button("Salvar")
+
+if submit_edit:
+    try:
+        api.update_transaction(
+            token,
+            edit_id,
+            account_id=int(ed_account),
+            category_id=int(ed_category),
+            type=ed_type,
+            amount=float(ed_amount),
+            date=ed_date.isoformat(),
+            description=ed_description.strip() or None,
+            payment_method=ed_payment or None,
+            is_recurring=bool(ed_recurring),
+            base_url=api_base,
+        )
+        st.success("Transacao atualizada")
+        st.rerun()
+    except api.ApiError as e:
+        st.error(e.detail)
+
+
+# ----- excluir transacao (S18-T03) -----
+
+st.subheader("Excluir transacao")
+
+del_id = st.selectbox(
+    "Transacao para excluir",
+    options=list(tx_by_id.keys()),
+    format_func=lambda i: _tx_label(tx_by_id[i]),
+    key="delete_tx_select",
+)
+
+confirmado = st.checkbox(
+    "Confirmo a exclusao — esta acao nao pode ser desfeita",
+    key="confirm_delete_tx",
+)
+
+if st.button("Excluir", type="primary", disabled=not confirmado, key="btn_delete_tx"):
+    try:
+        api.delete_transaction(token, int(del_id), base_url=api_base)
+        st.success("Transacao excluida")
+        st.rerun()
+    except api.ApiError as e:
+        st.error(e.detail)

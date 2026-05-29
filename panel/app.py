@@ -16,8 +16,11 @@ from __future__ import annotations
 import streamlit as st
 
 import api
+from ui import render_header
 
 st.set_page_config(page_title="OrcaFacil", page_icon=":money_with_wings:", layout="wide")
+
+render_header()
 
 
 def _logout() -> None:
