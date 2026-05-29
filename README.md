@@ -3,8 +3,6 @@
 App de controle financeiro pessoal. Este repositório concentra o **backend (FastAPI)**, o **painel web (Streamlit)**, os **scripts de devops** e a **documentação técnica** do projeto.
 
 > O app mobile (Flutter) vive em [frontend_OrcamentoFacil](https://github.com/TatianaCalixto/frontend_OrcamentoFacil).
->
-> 📋 **Este código é o substrato de um caso de uso de metodologia.** Para entender o método "documentação viva + agente executor" usado para planejar, executar e revisar este projeto com Claude Code, veja → [metodologia_OrcamentoFacil](https://github.com/TatianaCalixto/metodologia_OrcamentoFacil).
 
 ## Estrutura
 
@@ -151,6 +149,46 @@ black --check .       # apenas confere
 4. `pytest` (com cov gate)
 
 Service container `postgres:16-alpine` disponível para testes de integração.
+
+O step **Security audit** roda antes do lint (ver "Segurança de dependências").
+
+## Segurança de dependências
+
+Duas camadas de varredura de CVE (Fase 3 / Sprint 20):
+
+1. **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) — varredura
+   semanal de `backend/`, `panel/` e GitHub Actions; abre PRs de atualização e,
+   com "Dependabot security updates" ligado, PRs de correção de vulnerabilidade.
+2. **pip-audit no CI** ([`scripts/ci_pip_audit.py`](scripts/ci_pip_audit.py)) — gate
+   obrigatório em todo push/PR, rodando `pip-audit` contra `requirements.txt`.
+
+### Política de severidade
+
+O `pip-audit` sozinho falha em qualquer vulnerabilidade. O wrapper
+`scripts/ci_pip_audit.py` consulta a severidade na API pública do
+[OSV](https://osv.dev) e aplica:
+
+| Severidade (OSV) | Efeito no CI |
+|---|---|
+| **Critical / High** | ❌ Falha (build vermelho) |
+| **Medium / Low** | ⚠️ Warning (build passa) |
+| **Indeterminada** | ❌ Falha (fail-closed) |
+
+### Como remediar uma falha
+
+1. Veja na saída do step a dependência, o ID (GHSA/CVE) e a **fix version**.
+2. Atualize a versão em `backend/requirements.txt` para a fix indicada e rode
+   localmente:
+   ```bash
+   cd backend
+   python ../scripts/ci_pip_audit.py -r requirements.txt
+   ```
+3. Se não houver correção e o risco for aceito (com justificativa), adicione a
+   vuln à allowlist do pip-audit:
+   ```bash
+   pip-audit -r requirements.txt --ignore-vuln GHSA-xxxx-xxxx-xxxx
+   ```
+   (registre a justificativa na aba Decisões da planilha operacional).
 
 ## Deploy
 

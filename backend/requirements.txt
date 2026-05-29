@@ -25,3 +25,6 @@ requests>=2.32  # usado por scripts/smoke_prod.py (S16-T06)
 # --- Lint / Format ---
 ruff>=0.6
 black>=24.8
+
+# --- Segurança (CI) ---
+pip-audit>=2.7  # varredura de CVE; gate por severidade em scripts/ci_pip_audit.py (S20-T02)
