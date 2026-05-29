@@ -81,3 +81,6 @@ docker-compose.override.yml
 
 # ===== Alembic local cache =====
 alembic/versions/__pycache__/
+
+# ===== Ferramentas do agente (Claude Code) =====
+.claude/
