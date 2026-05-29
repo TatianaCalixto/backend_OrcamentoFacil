@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth.deps import get_current_user
 from app.auth.jwt import (
     TokenError,
     create_access_token,
     create_refresh_token,
     decode_token,
 )
+from app.auth.revoked import cleanup_expired, is_revoked, revoke
 from app.auth.security import hash_password, verify_password
 from app.categories.seed import seed_default_categories
 from app.core.ratelimit import limiter
@@ -107,6 +109,10 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     sub = claims.get("sub")
     if not sub or not str(sub).isdigit():
         raise unauth
+    # refresh revogado (logout) nao pode emitir novo par (S20-T05).
+    jti = claims.get("jti")
+    if jti and is_revoked(db, jti):
+        raise unauth
     user = db.get(User, int(sub))
     if user is None:
         raise unauth
@@ -114,3 +120,35 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
         access_token=create_access_token(user.id),
         refresh_token=create_refresh_token(user.id),
     )
+
+
+@router.post(
+    "/logout",
+    summary="Revoga o refresh token atual (logout)",
+    description="Autenticado (Bearer access). Recebe {refresh_token} e revoga seu "
+    "jti, impedindo emissao de novos tokens a partir dele. Idempotente: refresh "
+    "invalido/expirado ou sem jti retorna 200 sem erro.",
+)
+def logout(
+    payload: RefreshRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    try:
+        claims = decode_token(payload.refresh_token, expected_typ="refresh")
+    except TokenError:
+        # nada a revogar (logout idempotente)
+        return {"detail": "nenhum refresh ativo para revogar"}
+    if str(claims.get("sub")) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="refresh token nao pertence ao usuario autenticado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    jti = claims.get("jti")
+    if not jti:
+        return {"detail": "refresh sem jti (token antigo); nada a revogar"}
+    revoke(db, jti, current_user.id)
+    # limpeza oportunistica de registros ja expirados (cleanup on-demand)
+    cleanup_expired(db)
+    return {"detail": "logout efetuado"}

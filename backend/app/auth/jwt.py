@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -54,10 +55,12 @@ def create_refresh_token(
     expires: timedelta | None = None,
 ) -> str:
     settings = get_settings()
+    # jti unico permite revogar este refresh especifico no logout (S20-T05).
     return _encode(
         user_id,
         "refresh",
         expires or timedelta(minutes=settings.jwt_refresh_expire_minutes),
+        extra_claims={"jti": uuid.uuid4().hex},
     )
 
 
