@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.accounts.schemas import AccountCreate, AccountRead, AccountUpdate
 from app.accounts.service import AccountService
 from app.auth.deps import get_current_user
+from app.core.ratelimit import limiter
 from app.database.session import get_db
 from app.users.models import User
 
@@ -25,7 +26,9 @@ def list_accounts(
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_account(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     payload: AccountCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -46,7 +49,9 @@ def get_account(
 
 
 @router.patch("/{account_id}", response_model=AccountRead)
+@limiter.limit("10/minute")
 def update_account(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     account_id: int,
     payload: AccountUpdate,
     current_user: User = Depends(get_current_user),
@@ -59,7 +64,9 @@ def update_account(
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
 def delete_account(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     account_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

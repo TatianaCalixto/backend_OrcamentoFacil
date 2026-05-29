@@ -14,7 +14,7 @@ from app.main import app
 client = TestClient(app, raise_server_exceptions=False)
 
 
-def test_register_dispara_429_apos_10_chamadas() -> None:
+def test_register_dispara_429_apos_10_chamadas(rate_limit_active) -> None:
     for i in range(10):
         # nao importa se o registro falhou (422/409): o decorator do slowapi
         # incrementa o contador independentemente do resultado.
@@ -30,7 +30,7 @@ def test_register_dispara_429_apos_10_chamadas() -> None:
     assert r.status_code == 429
 
 
-def test_login_dispara_429_apos_10_chamadas() -> None:
+def test_login_dispara_429_apos_10_chamadas(rate_limit_active) -> None:
     for _ in range(10):
         client.post("/auth/login", json={"email": "x@ex.com", "password": "z"})
     r = client.post("/auth/login", json={"email": "x@ex.com", "password": "z"})

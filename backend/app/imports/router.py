@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.core.ratelimit import limiter
 from app.database.session import get_db
 from app.imports.schemas import ImportResult
 from app.imports.service import CsvImportOwnershipError, CsvImportService
@@ -26,7 +27,9 @@ _ALLOWED_CONTENT_TYPES = {
 
 
 @router.post("/csv", response_model=ImportResult)
+@limiter.limit("1/minute")
 async def import_csv(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     account_id: int = Form(..., gt=0),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),

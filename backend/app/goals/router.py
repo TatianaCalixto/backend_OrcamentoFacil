@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.core.ratelimit import limiter
 from app.database.session import get_db
 from app.goals.schemas import GoalCreate, GoalRead, GoalUpdate
 from app.goals.service import GoalService
@@ -25,7 +26,9 @@ def list_goals(
 
 
 @router.post("", response_model=GoalRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_goal(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     payload: GoalCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -46,7 +49,9 @@ def get_goal(
 
 
 @router.patch("/{goal_id}", response_model=GoalRead)
+@limiter.limit("10/minute")
 def update_goal(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     goal_id: int,
     payload: GoalUpdate,
     current_user: User = Depends(get_current_user),
@@ -59,7 +64,9 @@ def update_goal(
 
 
 @router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
 def delete_goal(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     goal_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

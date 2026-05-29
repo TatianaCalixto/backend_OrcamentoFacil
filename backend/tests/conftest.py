@@ -38,10 +38,25 @@ def _setup_schema():
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit():
-    """Limpa o storage do slowapi entre testes; tests que querem testar
-    429 podem usar a fixture rate_limit_active para reabilitar."""
+    """Desabilita o rate limit por padrao nos testes e limpa o storage entre
+    eles. A partir da S20-T03 ha limites nas mutacoes (transactions/accounts/
+    budgets/goals/imports); sem desabilitar por padrao, testes que criam varios
+    recursos (ex.: regressao de saldo) estourariam 429. Testes que querem
+    validar 429 reabilitam via a fixture rate_limit_active."""
     from app.core.ratelimit import limiter
 
+    limiter.enabled = False
     limiter.reset()
     yield
     limiter.reset()
+
+
+@pytest.fixture
+def rate_limit_active():
+    """Reabilita o limiter para o teste atual (opt-in). Roda apos o autouse
+    _reset_rate_limit, entao prevalece (enabled=True)."""
+    from app.core.ratelimit import limiter
+
+    limiter.enabled = True
+    yield
+    limiter.enabled = False

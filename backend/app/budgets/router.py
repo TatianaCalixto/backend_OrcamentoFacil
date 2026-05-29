@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -15,6 +15,7 @@ from app.budgets.schemas import (
     BudgetWithUsage,
 )
 from app.budgets.service import BudgetOwnershipError, BudgetService
+from app.core.ratelimit import limiter
 from app.database.session import get_db
 from app.users.models import User
 
@@ -38,7 +39,9 @@ def list_budgets(
 
 
 @router.post("", response_model=BudgetRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 def create_budget(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     payload: BudgetCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -62,7 +65,9 @@ def get_budget(
 
 
 @router.patch("/{budget_id}", response_model=BudgetRead)
+@limiter.limit("10/minute")
 def update_budget(
+    request: Request,  # noqa: ARG001 — exigido pelo slowapi
     budget_id: int,
     payload: BudgetUpdate,
     current_user: User = Depends(get_current_user),
