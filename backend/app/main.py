@@ -31,7 +31,11 @@ from app.transactions.router import router as transactions_router
 from app.users.router import router as users_router
 
 _settings = get_settings()
-configure_logging(_settings.environment)
+configure_logging(
+    _settings.environment,
+    log_shipping_url=_settings.log_shipping_url,
+    log_shipping_token=_settings.log_shipping_token,
+)
 logger = logging.getLogger("orcafacil")
 
 app = FastAPI(

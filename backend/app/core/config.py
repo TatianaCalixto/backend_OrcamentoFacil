@@ -47,6 +47,12 @@ class Settings(BaseSettings):
         default="development", alias="ENVIRONMENT"
     )
 
+    # ----- Log shipping (S21-T03): agregador externo opcional -----
+    # Quando ambos definidos, logs estruturados sao enviados via POST ao agregador
+    # (Better Stack/Logtail/etc.). Ausentes -> comportamento atual (so stdout).
+    log_shipping_url: str | None = Field(default=None, alias="LOG_SHIPPING_URL")
+    log_shipping_token: str | None = Field(default=None, alias="LOG_SHIPPING_TOKEN")
+
     # ----- CORS (S10-T01): aceita CSV ("a,b") ou JSON ('["a","b"]') no env -----
     cors_origins: list[str] = Field(default_factory=_default_cors, alias="CORS_ORIGINS")
 
