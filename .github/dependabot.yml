@@ -1,0 +1,43 @@
+# Dependabot — OrçaFácil backend (S20-T01, Fase 3)
+# Varredura semanal de CVE/atualizações nas dependências do backend FastAPI,
+# do painel Streamlit e dos GitHub Actions. Grupos: prod / dev / actions.
+#
+# Nota: os PRs de *version updates* abaixo são agendados (weekly). Os PRs
+# automáticos para vulnerabilidades High/Critical vêm do "Dependabot security
+# updates", que é um toggle de repositório (Settings > Code security and
+# analysis). Habilitar lá além deste arquivo.
+version: 2
+updates:
+  # --- Backend (FastAPI) — pip ---
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      prod:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+
+  # --- Painel (Streamlit) — pip ---
+  - package-ecosystem: "pip"
+    directory: "/panel"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      prod:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+
+  # --- GitHub Actions ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
