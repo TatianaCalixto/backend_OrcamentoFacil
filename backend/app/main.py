@@ -13,6 +13,7 @@ import time
 
 from fastapi import Depends, FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -126,3 +127,9 @@ def healthz(response: Response, db: Session = Depends(get_db)) -> dict:
         "uptime_seconds": round(time.monotonic() - _START_MONOTONIC, 1),
         "database": {"status": db_status, "latency_ms": latency_ms},
     }
+
+
+# Metricas Prometheus em /metrics (S21-T05): latencia por endpoint, contagem de
+# requests e de erros. Sem autenticacao por padrao (a planilha permite); pode
+# ficar atras de basic auth via proxy/env em producao se necessario.
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
