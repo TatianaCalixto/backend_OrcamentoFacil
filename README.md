@@ -14,6 +14,10 @@ sprints**: a documentação define o *quê* e os critérios de pronto, e a
 implementação avança sprint a sprint, com **testes obrigatórios** e
 **rastreabilidade** de cada módulo até a sprint que o originou.
 
+Estes projetos são desenvolvidos em **parceria com IA**: a arquitetura, os critérios
+e a documentação são definidos por mim; a IA executa sob essa direção, sprint a
+sprint. O método importa mais que a ferramenta.
+
 O detalhamento da metodologia e o plano operacional completo ficam fora deste
 repositório.
 
