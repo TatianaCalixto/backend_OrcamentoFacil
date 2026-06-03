@@ -4,6 +4,19 @@ App de controle financeiro pessoal. Este repositório concentra o **backend (Fas
 
 > O app mobile (Flutter) vive em [frontend_OrcamentoFacil](https://github.com/TatianaCalixto/frontend_OrcamentoFacil).
 
+🧭 Projeto desenvolvido com um fluxo de **documentação viva guiando a execução por sprints rastreáveis**.
+
+
+## Como este projeto foi construído
+
+Este projeto seguiu um fluxo de **documentação viva guiando a execução por
+sprints**: a documentação define o *quê* e os critérios de pronto, e a
+implementação avança sprint a sprint, com **testes obrigatórios** e
+**rastreabilidade** de cada módulo até a sprint que o originou.
+
+O detalhamento da metodologia e o plano operacional completo ficam fora deste
+repositório.
+
 ## Estrutura
 
 ```
