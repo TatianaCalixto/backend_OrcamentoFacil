@@ -10,11 +10,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.goals.models import GoalStatus
 
 
-class GoalCreate(BaseModel):
+class GoalBase(BaseModel):
+    """Campos comuns de entrada de uma meta (S24-T03)."""
+
     name: str = Field(min_length=1, max_length=120)
     target_amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     current_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=2)
     deadline: date_type | None = None
+
+
+class GoalCreate(GoalBase):
+    pass
 
 
 class GoalUpdate(BaseModel):
@@ -24,13 +30,9 @@ class GoalUpdate(BaseModel):
     deadline: date_type | None = None
 
 
-class GoalRead(BaseModel):
+class GoalRead(GoalBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
-    name: str
-    target_amount: Decimal
-    current_amount: Decimal
-    deadline: date_type | None
     status: GoalStatus

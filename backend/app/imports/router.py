@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
 from app.core.ratelimit import limiter
@@ -33,19 +33,19 @@ async def import_csv(
     account_id: int = Form(..., gt=0),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> ImportResult:
     # validacao de extensao e MIME
     filename = (file.filename or "").lower()
     if not filename.endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="arquivo precisa ter extensao .csv",
+            detail="arquivo precisa ter extensão .csv",
         )
     if file.content_type and file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"content-type nao suportado: {file.content_type}",
+            detail=f"tipo de conteúdo não suportado: {file.content_type}",
         )
 
     content = await file.read()
@@ -61,6 +61,6 @@ async def import_csv(
         )
 
     try:
-        return CsvImportService(db).import_csv(current_user.id, account_id, content)
+        return await CsvImportService(db).import_csv(current_user.id, account_id, content)
     except CsvImportOwnershipError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

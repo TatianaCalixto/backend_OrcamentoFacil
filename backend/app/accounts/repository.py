@@ -7,34 +7,34 @@ neste modulo (isolamento por usuario por construcao).
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.models import Account
 
 
 class AccountRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def list_by_user(self, user_id: int) -> list[Account]:
+    async def list_by_user(self, user_id: int) -> list[Account]:
         stmt = select(Account).where(Account.user_id == user_id).order_by(Account.id)
-        return list(self.db.execute(stmt).scalars().all())
+        return list((await self.db.execute(stmt)).scalars().all())
 
-    def get_for_user(self, user_id: int, account_id: int) -> Account | None:
+    async def get_for_user(self, user_id: int, account_id: int) -> Account | None:
         stmt = select(Account).where(Account.user_id == user_id, Account.id == account_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    def add(self, account: Account) -> Account:
+    async def add(self, account: Account) -> Account:
         self.db.add(account)
-        self.db.commit()
-        self.db.refresh(account)
+        await self.db.flush()
+        await self.db.refresh(account)
         return account
 
-    def save(self, account: Account) -> Account:
-        self.db.commit()
-        self.db.refresh(account)
+    async def save(self, account: Account) -> Account:
+        await self.db.flush()
+        await self.db.refresh(account)
         return account
 
-    def delete(self, account: Account) -> None:
-        self.db.delete(account)
-        self.db.commit()
+    async def delete(self, account: Account) -> None:
+        await self.db.delete(account)
+        await self.db.flush()

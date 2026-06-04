@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 import api
+from services import accounts_service
 from ui import render_header
 
 st.set_page_config(page_title="Contas - OrcaFacil", layout="wide")
@@ -31,7 +32,7 @@ TYPE_LABELS = {
 
 # ----- carregar lista -----
 try:
-    accounts = api.list_accounts(token, base_url=api_base)
+    accounts = accounts_service.list_accounts(token, base_url=api_base)
 except api.ApiError as e:
     st.error(f"Erro ao carregar contas: {e.detail}")
     st.stop()
@@ -74,7 +75,7 @@ with st.expander("+ Nova conta"):
                 st.error("Nome e obrigatorio.")
             else:
                 try:
-                    api.create_account(
+                    accounts_service.create_account(
                         token,
                         name=new_name.strip(),
                         type=new_type,
@@ -114,7 +115,7 @@ if accounts:
                     st.error("Nome e obrigatorio.")
                 else:
                     try:
-                        api.update_account(
+                        accounts_service.update_account(
                             token,
                             edit_id,
                             name=ed_name.strip(),
@@ -137,7 +138,7 @@ if accounts:
         confirmado = st.checkbox("Confirmo a exclusao")
         if st.button("Excluir", type="primary", disabled=not confirmado):
             try:
-                api.delete_account(token, del_id, base_url=api_base)
+                accounts_service.delete_account(token, del_id, base_url=api_base)
                 st.success("Conta excluida")
                 st.rerun()
             except api.ApiError as e:

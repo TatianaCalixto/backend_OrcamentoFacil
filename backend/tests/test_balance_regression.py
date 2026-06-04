@@ -50,11 +50,11 @@ def _create_account(token: str, name: str, initial: str) -> int:
     return r.json()["id"]
 
 
-def _income_cat(uid: int, name: str) -> int:
-    with SessionLocal() as db:
+async def _income_cat(uid: int, name: str) -> int:
+    async with SessionLocal() as db:
         c = Category(user_id=uid, name=name, type="income")
         db.add(c)
-        db.commit()
+        await db.commit()
         return c.id
 
 
@@ -109,7 +109,7 @@ def _delete_tx(token: str, tid: int) -> None:
 # ============================================================
 
 
-def test_balance_regression_full_flow() -> None:
+async def test_balance_regression_full_flow() -> None:
     """Fluxo realista: 2 contas, varias transacoes, edicoes, mudancas de
     conta e deletes. Saldos finais conferem ao centavo."""
     token, uid = _register_login("ana@ex.com")
@@ -119,7 +119,7 @@ def test_balance_regression_full_flow() -> None:
     poup = _create_account(token, "Poupanca", "5000.00")
 
     # categorias
-    salario = _income_cat(uid, "Salario")
+    salario = await _income_cat(uid, "Salario")
     despesa = _expense_cat_id(token)  # categoria default expense
 
     # ---- semana 1: salario + algumas despesas ----
@@ -251,12 +251,12 @@ def test_balance_regression_full_flow() -> None:
 # ============================================================
 
 
-def test_balance_regression_soma_de_lista_eh_consistente() -> None:
+async def test_balance_regression_soma_de_lista_eh_consistente() -> None:
     """Para qualquer sequencia de N transacoes em uma conta zerada,
     current_balance == sum(income) - sum(expense)."""
     token, uid = _register_login("a@ex.com")
     acc = _create_account(token, "X", "0.00")
-    income_cat = _income_cat(uid, "I")
+    income_cat = await _income_cat(uid, "I")
     expense_cat = _expense_cat_id(token)
 
     operacoes = [
@@ -277,13 +277,13 @@ def test_balance_regression_soma_de_lista_eh_consistente() -> None:
     assert _balance(token, acc) == esperado
 
 
-def test_balance_regression_initial_balance_eh_imutavel_via_api() -> None:
+async def test_balance_regression_initial_balance_eh_imutavel_via_api() -> None:
     """A regra atual: current_balance varia; initial_balance NAO muda quando
     se cria transacoes. (Documenta invariante; a edicao manual de
     initial_balance via PATCH /accounts nao esta no contrato desta sprint.)"""
     token, uid = _register_login("a@ex.com")
     acc = _create_account(token, "X", "500.00")
-    cat_in = _income_cat(uid, "I")
+    cat_in = await _income_cat(uid, "I")
 
     _post_tx(token, account_id=acc, category_id=cat_in, type_="income", amount="100")
 
@@ -301,10 +301,10 @@ def test_balance_regression_initial_balance_eh_imutavel_via_api() -> None:
         ([("income", "0.01"), ("income", "0.02"), ("income", "0.03")], "0.06"),
     ],
 )
-def test_balance_regression_parametrico_pequenos_casos(ops, esperado_str) -> None:
+async def test_balance_regression_parametrico_pequenos_casos(ops, esperado_str) -> None:
     token, uid = _register_login("x@ex.com")
     acc = _create_account(token, "X", "0.00")
-    cat_in = _income_cat(uid, "I")
+    cat_in = await _income_cat(uid, "I")
     cat_ex = _expense_cat_id(token)
     for type_, amount in ops:
         cat = cat_in if type_ == "income" else cat_ex
@@ -312,11 +312,11 @@ def test_balance_regression_parametrico_pequenos_casos(ops, esperado_str) -> Non
     assert _balance(token, acc) == Decimal(esperado_str)
 
 
-def test_balance_regression_delete_apos_update_volta_ao_baseline() -> None:
+async def test_balance_regression_delete_apos_update_volta_ao_baseline() -> None:
     """Cria, edita varias vezes, deleta — saldo volta ao initial_balance."""
     token, uid = _register_login("y@ex.com")
     acc = _create_account(token, "X", "1000.00")
-    cat_in = _income_cat(uid, "I")
+    cat_in = await _income_cat(uid, "I")
 
     tid = _post_tx(token, account_id=acc, category_id=cat_in, type_="income", amount="100")
     _patch_tx(token, tid, amount="300")
@@ -327,14 +327,14 @@ def test_balance_regression_delete_apos_update_volta_ao_baseline() -> None:
     assert _balance(token, acc) == Decimal("1000.00")
 
 
-def test_balance_regression_e_isolada_entre_usuarios() -> None:
+async def test_balance_regression_e_isolada_entre_usuarios() -> None:
     """Transacoes do user A NUNCA podem mexer no saldo do user B."""
     token_a, uid_a = _register_login("a@ex.com")
     token_b, _uid_b = _register_login("b@ex.com")
 
     acc_a = _create_account(token_a, "Aca", "100.00")
     acc_b = _create_account(token_b, "Bca", "200.00")
-    cat_a = _income_cat(uid_a, "Ia")
+    cat_a = await _income_cat(uid_a, "Ia")
 
     # A cria varias transacoes
     for _ in range(5):

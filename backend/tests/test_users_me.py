@@ -55,11 +55,11 @@ def test_me_com_token_expirado_retorna_401() -> None:
     assert r.status_code == 401
 
 
-def test_me_com_token_de_usuario_deletado_retorna_401() -> None:
+async def test_me_com_token_de_usuario_deletado_retorna_401() -> None:
     user_id, token = _register_and_login()
-    with SessionLocal() as db:
-        db.execute(delete(User).where(User.id == user_id))
-        db.commit()
+    async with SessionLocal() as db:
+        await db.execute(delete(User).where(User.id == user_id))
+        await db.commit()
     r = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
 

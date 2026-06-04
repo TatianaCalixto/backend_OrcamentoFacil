@@ -12,15 +12,17 @@ _HEX_COLOR_LEN = 7  # "#rrggbb"
 def _validate_hex_color(v: str) -> str:
     v = v.strip()
     if len(v) != _HEX_COLOR_LEN or not v.startswith("#"):
-        raise ValueError("color deve estar no formato #rrggbb")
+        raise ValueError("cor deve estar no formato #rrggbb")
     try:
         int(v[1:], 16)
     except ValueError as e:
-        raise ValueError("color deve ser hexadecimal valido") from e
+        raise ValueError("cor deve ser um hexadecimal válido") from e
     return v.lower()
 
 
-class CategoryCreate(BaseModel):
+class CategoryBase(BaseModel):
+    """Campos comuns de entrada de uma categoria (S24-T03)."""
+
     name: str = Field(min_length=1, max_length=60)
     type: CategoryType
     color: str = Field(default="#888888")
@@ -30,6 +32,10 @@ class CategoryCreate(BaseModel):
     @classmethod
     def _color(cls, v: str) -> str:
         return _validate_hex_color(v)
+
+
+class CategoryCreate(CategoryBase):
+    pass
 
 
 class CategoryUpdate(BaseModel):
@@ -44,13 +50,9 @@ class CategoryUpdate(BaseModel):
         return _validate_hex_color(v) if v is not None else None
 
 
-class CategoryRead(BaseModel):
+class CategoryRead(CategoryBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
-    name: str
-    type: CategoryType
-    color: str
-    icon: str
     is_default: bool

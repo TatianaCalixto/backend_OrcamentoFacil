@@ -92,7 +92,7 @@ def test_unhandled_exception_500_tem_payload_padronizado(
     resp = client.get("/boom")
     assert resp.status_code == 500
     body = resp.json()
-    assert body["detail"] == "Internal Server Error"
+    assert body["detail"] == "erro interno do servidor"
     assert body["code"] == "internal_error"
     assert _is_uuid(body["request_id"])
 

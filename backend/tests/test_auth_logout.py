@@ -69,14 +69,14 @@ def test_logout_duas_vezes_e_idempotente() -> None:
     assert r.status_code == 200
 
 
-def test_cleanup_remove_apenas_expirados() -> None:
+async def test_cleanup_remove_apenas_expirados() -> None:
     _a, _r, uid = _register_login("cln@ex.com")
     now = datetime.now(UTC)
-    with SessionLocal() as db:
+    async with SessionLocal() as db:
         db.add(RevokedToken(jti="velho", user_id=uid, revoked_at=now - timedelta(days=30)))
         db.add(RevokedToken(jti="novo", user_id=uid, revoked_at=now))
-        db.commit()
-        removed = cleanup_expired(db, now=now)
+        await db.commit()
+        removed = await cleanup_expired(db, now=now)
         assert removed == 1
-        assert db.get(RevokedToken, "velho") is None
-        assert db.get(RevokedToken, "novo") is not None
+        assert await db.get(RevokedToken, "velho") is None
+        assert await db.get(RevokedToken, "novo") is not None

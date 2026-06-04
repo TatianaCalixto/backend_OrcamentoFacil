@@ -23,37 +23,33 @@ def status_for(percent_used: Decimal) -> BudgetStatus:
     return BudgetStatus.OK
 
 
-class BudgetCreate(BaseModel):
+class BudgetBase(BaseModel):
+    """Campos comuns de entrada de um orcamento (S24-T03)."""
+
     category_id: int = Field(gt=0)
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000, le=2100)
     limit_amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
 
 
+class BudgetCreate(BudgetBase):
+    pass
+
+
 class BudgetUpdate(BaseModel):
     limit_amount: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
 
 
-class BudgetRead(BaseModel):
+class BudgetRead(BudgetBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
-    category_id: int
-    month: int
-    year: int
-    limit_amount: Decimal
 
 
-class BudgetWithUsage(BaseModel):
+class BudgetWithUsage(BudgetRead):
     """Budget enriquecido com o uso calculado para o mes/ano corrente do budget."""
 
-    id: int
-    user_id: int
-    category_id: int
-    month: int
-    year: int
-    limit_amount: Decimal
     used_amount: Decimal
     percent_used: Decimal
     status: BudgetStatus

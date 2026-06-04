@@ -35,7 +35,7 @@ def test_senha_curta_rejeitada() -> None:
 def test_senha_so_letras_rejeitada() -> None:
     with pytest.raises(ValidationError) as exc:
         _make("abcdefgh")  # 8 letras, sem numero
-    assert "numero" in str(exc.value)
+    assert "número" in str(exc.value)
 
 
 def test_senha_so_numeros_rejeitada() -> None:
@@ -56,7 +56,7 @@ def test_register_senha_fraca_retorna_422_com_mensagem() -> None:
     )
     assert r.status_code == 422
     assert r.json()["code"] == "validation_error"
-    assert "numero" in r.text.lower()  # mensagem util chegou no corpo
+    assert "número" in r.text.lower()  # mensagem util chegou no corpo
 
 
 def test_register_senha_forte_cria_usuario() -> None:

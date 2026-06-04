@@ -10,26 +10,26 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import RevokedToken
 from app.core.config import get_settings
 
 
-def is_revoked(db: Session, jti: str) -> bool:
-    return db.get(RevokedToken, jti) is not None
+async def is_revoked(db: AsyncSession, jti: str) -> bool:
+    return await db.get(RevokedToken, jti) is not None
 
 
-def revoke(db: Session, jti: str, user_id: int) -> bool:
+async def revoke(db: AsyncSession, jti: str, user_id: int) -> bool:
     """Revoga um jti. Idempotente: retorna False se ja estava revogado."""
-    if db.get(RevokedToken, jti) is not None:
+    if await db.get(RevokedToken, jti) is not None:
         return False
     db.add(RevokedToken(jti=jti, user_id=user_id))
-    db.commit()
+    await db.flush()
     return True
 
 
-def cleanup_expired(db: Session, *, now: datetime | None = None) -> int:
+async def cleanup_expired(db: AsyncSession, *, now: datetime | None = None) -> int:
     """Remove registros cujo refresh token ja expirou com certeza.
 
     Como exp = iat + lifetime e iat <= revoked_at, vale exp <= revoked_at +
@@ -40,6 +40,6 @@ def cleanup_expired(db: Session, *, now: datetime | None = None) -> int:
     settings = get_settings()
     now = now or datetime.now(UTC)
     cutoff = now - timedelta(minutes=settings.jwt_refresh_expire_minutes)
-    result = db.execute(delete(RevokedToken).where(RevokedToken.revoked_at < cutoff))
-    db.commit()
+    result = await db.execute(delete(RevokedToken).where(RevokedToken.revoked_at < cutoff))
+    # UoW (S24-T02): sem commit aqui — a borda (get_db) commita o request inteiro.
     return result.rowcount or 0

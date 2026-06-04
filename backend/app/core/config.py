@@ -70,7 +70,7 @@ class Settings(BaseSettings):
 
                 return [str(x).strip() for x in json.loads(s) if str(x).strip()]
             return [item.strip() for item in s.split(",") if item.strip()]
-        raise ValueError("CORS_ORIGINS invalido")
+        raise ValueError("CORS_ORIGINS inválido")
 
 
 @lru_cache

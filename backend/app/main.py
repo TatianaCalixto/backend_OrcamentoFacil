@@ -16,13 +16,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import __version__
 from app.accounts.router import router as accounts_router
 from app.auth.router import router as auth_router
 from app.budgets.router import router as budgets_router
 from app.categories.router import router as categories_router
+from app.core.cache_headers import CacheHeadersMiddleware
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
@@ -82,6 +83,9 @@ app.add_middleware(
     production=_settings.environment == "production",
 )
 
+# Cache-Control em GET 2xx para o mobile cachear (S25-T05); exclui health/metrics
+app.add_middleware(CacheHeadersMiddleware)
+
 register_error_handlers(app)
 
 app.include_router(auth_router)
@@ -111,12 +115,12 @@ _START_MONOTONIC = time.monotonic()
     "(SELECT 1 + latencia). DB ok -> 200; DB indisponivel -> 503. Nao expoe "
     "credenciais nem string de conexao.",
 )
-def healthz(response: Response, db: Session = Depends(get_db)) -> dict:
+async def healthz(response: Response, db: AsyncSession = Depends(get_db)) -> dict:
     db_status = "up"
     latency_ms: float | None = None
     started = time.perf_counter()
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         latency_ms = round((time.perf_counter() - started) * 1000, 2)
     except Exception:
         db_status = "down"

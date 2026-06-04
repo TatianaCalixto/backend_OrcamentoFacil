@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.models import Account
 from app.categories.models import Category
@@ -35,19 +35,19 @@ def _signed_txn(t: Transaction) -> Decimal:
 
 
 class TransactionService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.repo = TransactionRepository(db)
 
     # ------------------ leitura ------------------
 
-    def get_for_user(self, user_id: int, txn_id: int) -> Transaction | None:
-        return self.repo.get_for_user(user_id, txn_id)
+    async def get_for_user(self, user_id: int, txn_id: int) -> Transaction | None:
+        return await self.repo.get_for_user(user_id, txn_id)
 
-    def list_for_user(self, user_id: int) -> list[Transaction]:
-        return self.repo.list_by_user(user_id)
+    async def list_for_user(self, user_id: int) -> list[Transaction]:
+        return await self.repo.list_by_user(user_id)
 
-    def list_paginated(
+    async def list_paginated(
         self,
         user_id: int,
         filters: TransactionFilters,
@@ -55,29 +55,29 @@ class TransactionService:
         page_size: int,
         order_by: str = "-date",
     ) -> tuple[list[Transaction], int]:
-        items = self.repo.list_paginated(user_id, filters, page, page_size, order_by)
-        total = self.repo.count(user_id, filters)
+        items = await self.repo.list_paginated(user_id, filters, page, page_size, order_by)
+        total = await self.repo.count(user_id, filters)
         return items, total
 
     # ------------------ ownership ------------------
 
-    def _account_of(self, user_id: int, account_id: int) -> Account:
-        acc = self.db.get(Account, account_id)
+    async def _account_of(self, user_id: int, account_id: int) -> Account:
+        acc = await self.db.get(Account, account_id)
         if acc is None or acc.user_id != user_id:
-            raise OwnershipError("account nao encontrada ou nao pertence ao usuario")
+            raise OwnershipError("conta não encontrada ou não pertence ao usuário")
         return acc
 
-    def _category_of(self, user_id: int, category_id: int) -> Category:
-        cat = self.db.get(Category, category_id)
+    async def _category_of(self, user_id: int, category_id: int) -> Category:
+        cat = await self.db.get(Category, category_id)
         if cat is None or cat.user_id != user_id:
-            raise OwnershipError("category nao encontrada ou nao pertence ao usuario")
+            raise OwnershipError("categoria não encontrada ou não pertence ao usuário")
         return cat
 
     # ------------------ create ------------------
 
-    def create_for_user(self, user_id: int, payload: TransactionCreate) -> Transaction:
-        account = self._account_of(user_id, payload.account_id)
-        self._category_of(user_id, payload.category_id)  # so valida
+    async def create_for_user(self, user_id: int, payload: TransactionCreate) -> Transaction:
+        account = await self._account_of(user_id, payload.account_id)
+        await self._category_of(user_id, payload.category_id)  # so valida
 
         txn = Transaction(
             user_id=user_id,
@@ -92,16 +92,16 @@ class TransactionService:
         )
         account.current_balance = account.current_balance + _signed_txn(txn)
         self.db.add(txn)
-        self.db.commit()
-        self.db.refresh(txn)
+        await self.db.flush()
+        await self.db.refresh(txn)
         return txn
 
     # ------------------ update ------------------
 
-    def update_for_user(
+    async def update_for_user(
         self, user_id: int, txn_id: int, payload: TransactionUpdate
     ) -> Transaction | None:
-        txn = self.repo.get_for_user(user_id, txn_id)
+        txn = await self.repo.get_for_user(user_id, txn_id)
         if txn is None:
             return None
 
@@ -111,9 +111,9 @@ class TransactionService:
         new_account_id = updates.get("account_id", txn.account_id)
         new_category_id = updates.get("category_id", txn.category_id)
         if "account_id" in updates:
-            self._account_of(user_id, new_account_id)
+            await self._account_of(user_id, new_account_id)
         if "category_id" in updates:
-            self._category_of(user_id, new_category_id)
+            await self._category_of(user_id, new_category_id)
 
         # snapshot do estado atual (para reverter o saldo da conta antiga)
         old_account_id = txn.account_id
@@ -127,26 +127,26 @@ class TransactionService:
         # ajuste de saldo
         if new_account_id == old_account_id:
             # mesma conta: delta = new_signed - old_signed
-            account = self._account_of(user_id, old_account_id)
+            account = await self._account_of(user_id, old_account_id)
             account.current_balance = account.current_balance + (new_signed - old_signed)
         else:
-            old_account = self._account_of(user_id, old_account_id)
+            old_account = await self._account_of(user_id, old_account_id)
             old_account.current_balance = old_account.current_balance - old_signed
-            new_account = self._account_of(user_id, new_account_id)
+            new_account = await self._account_of(user_id, new_account_id)
             new_account.current_balance = new_account.current_balance + new_signed
 
-        self.db.commit()
-        self.db.refresh(txn)
+        await self.db.flush()
+        await self.db.refresh(txn)
         return txn
 
     # ------------------ delete ------------------
 
-    def delete_for_user(self, user_id: int, txn_id: int) -> bool:
-        txn = self.repo.get_for_user(user_id, txn_id)
+    async def delete_for_user(self, user_id: int, txn_id: int) -> bool:
+        txn = await self.repo.get_for_user(user_id, txn_id)
         if txn is None:
             return False
-        account = self._account_of(user_id, txn.account_id)
+        account = await self._account_of(user_id, txn.account_id)
         account.current_balance = account.current_balance - _signed_txn(txn)
-        self.db.delete(txn)
-        self.db.commit()
+        await self.db.delete(txn)
+        await self.db.flush()
         return True

@@ -35,11 +35,11 @@ def _create_acc(token: str, name: str, initial: str = "0") -> int:
     return r.json()["id"]
 
 
-def _income_cat(uid: int, name: str) -> int:
-    with SessionLocal() as db:
+async def _income_cat(uid: int, name: str) -> int:
+    async with SessionLocal() as db:
         c = Category(user_id=uid, name=name, type="income")
         db.add(c)
-        db.commit()
+        await db.commit()
         return c.id
 
 
@@ -64,11 +64,11 @@ def _tx(token: str, acc: int, cat: int, type_: str, amount: str, dt: str) -> Non
 
 
 @pytest.fixture
-def setup_a():
+async def setup_a():
     token, uid = _register("a@ex.com")
     acc1 = _create_acc(token, "Nu", "1000")
     acc2 = _create_acc(token, "Poup", "500")
-    cat_in = _income_cat(uid, "Salario")
+    cat_in = await _income_cat(uid, "Salario")
     cat_ex = _expense_cat(token)
     return {
         "token": token,
@@ -131,12 +131,12 @@ def test_breakdown_mes_vazio_lista_vazia(setup_a) -> None:
     assert body["items"] == []
 
 
-def test_breakdown_ordenado_desc_e_so_despesas(setup_a) -> None:
+async def test_breakdown_ordenado_desc_e_so_despesas(setup_a) -> None:
     # cria mais uma categoria expense
-    with SessionLocal() as db:
+    async with SessionLocal() as db:
         outra = Category(user_id=setup_a["uid"], name="Lazer", type="expense")
         db.add(outra)
-        db.commit()
+        await db.commit()
         outra_id = outra.id
 
     _tx(setup_a["token"], setup_a["acc1"], setup_a["cat_ex"], "expense", "100", "2026-05-01")

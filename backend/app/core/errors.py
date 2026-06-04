@@ -79,7 +79,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
     return JSONResponse(
         status_code=500,
-        content=_payload("Internal Server Error", "internal_error", rid),
+        content=_payload("erro interno do servidor", "internal_error", rid),
         headers={REQUEST_ID_HEADER: rid},
     )
 

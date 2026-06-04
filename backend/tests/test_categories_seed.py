@@ -14,45 +14,49 @@ from app.users.models import User
 client = TestClient(app, raise_server_exceptions=False)
 
 
-def test_seed_cria_8_categorias_padrao_para_user() -> None:
-    with SessionLocal() as db:
+async def test_seed_cria_8_categorias_padrao_para_user() -> None:
+    async with SessionLocal() as db:
         u = User(name="A", email="a@ex.com", password_hash="h")
         db.add(u)
-        db.commit()
+        await db.commit()
         uid = u.id
 
-    with SessionLocal() as db:
-        criadas = seed_default_categories(db, uid)
+    async with SessionLocal() as db:
+        criadas = await seed_default_categories(db, uid)
         assert len(criadas) == len(DEFAULT_CATEGORIES) == 8
         for c in criadas:
             assert c.is_default is True
             assert c.color.startswith("#")
             assert c.icon
+        await db.commit()
 
-    with SessionLocal() as db:
-        all_cats = db.execute(select(Category).where(Category.user_id == uid)).scalars().all()
+    async with SessionLocal() as db:
+        all_cats = (
+            (await db.execute(select(Category).where(Category.user_id == uid))).scalars().all()
+        )
         assert len(all_cats) == 8
 
 
-def test_seed_e_idempotente() -> None:
-    with SessionLocal() as db:
+async def test_seed_e_idempotente() -> None:
+    async with SessionLocal() as db:
         u = User(name="A", email="a@ex.com", password_hash="h")
         db.add(u)
-        db.commit()
+        await db.commit()
         uid = u.id
 
-    with SessionLocal() as db:
-        seed_default_categories(db, uid)
-    with SessionLocal() as db:
+    async with SessionLocal() as db:
+        await seed_default_categories(db, uid)
+        await db.commit()
+    async with SessionLocal() as db:
         # segunda chamada nao adiciona
-        novas = seed_default_categories(db, uid)
+        novas = await seed_default_categories(db, uid)
         assert novas == []
-    with SessionLocal() as db:
-        total = db.execute(select(Category).where(Category.user_id == uid)).scalars().all()
+    async with SessionLocal() as db:
+        total = (await db.execute(select(Category).where(Category.user_id == uid))).scalars().all()
         assert len(total) == 8
 
 
-def test_register_dispara_seed_automatico() -> None:
+async def test_register_dispara_seed_automatico() -> None:
     r = client.post(
         "/auth/register",
         json={"name": "Bia", "email": "bia@ex.com", "password": "senha123"},
@@ -60,8 +64,8 @@ def test_register_dispara_seed_automatico() -> None:
     assert r.status_code == 201
     uid = r.json()["id"]
 
-    with SessionLocal() as db:
-        cats = db.execute(select(Category).where(Category.user_id == uid)).scalars().all()
+    async with SessionLocal() as db:
+        cats = (await db.execute(select(Category).where(Category.user_id == uid))).scalars().all()
         nomes = {c.name for c in cats}
         assert len(cats) == 8
         assert nomes == {n for (n, *_rest) in DEFAULT_CATEGORIES}

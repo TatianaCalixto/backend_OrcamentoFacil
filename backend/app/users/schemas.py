@@ -18,7 +18,7 @@ class UserCreate(BaseModel):
     def _normalize_email(cls, v: str) -> str:
         v = v.strip().lower()
         if "@" not in v or "." not in v.split("@")[-1]:
-            raise ValueError("email invalido")
+            raise ValueError("email inválido")
         return v
 
     @field_validator("password")
@@ -26,11 +26,11 @@ class UserCreate(BaseModel):
     def _validate_password_strength(cls, v: str) -> str:
         """Politica de senha forte (S20-T06): >=8 chars, >=1 letra e >=1 numero."""
         if len(v) < 8:
-            raise ValueError("senha deve ter no minimo 8 caracteres")
+            raise ValueError("senha deve ter no mínimo 8 caracteres")
         if not any(c.isalpha() for c in v):
             raise ValueError("senha deve conter ao menos 1 letra")
         if not any(c.isdigit() for c in v):
-            raise ValueError("senha deve conter ao menos 1 numero")
+            raise ValueError("senha deve conter ao menos 1 número")
         return v
 
 

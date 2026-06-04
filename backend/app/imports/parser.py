@@ -81,7 +81,7 @@ def _parse_date(raw: str) -> date_type:
             return datetime.strptime(raw, fmt).date()
         except ValueError:
             continue
-    raise ValueError(f"data invalida: {raw!r}")
+    raise ValueError(f"data inválida: {raw!r}")
 
 
 _MONEY_RE = re.compile(r"^-?(R\$\s*)?([\d.,]+)$")
@@ -93,7 +93,7 @@ def _parse_amount(raw: str) -> Decimal:
         raise ValueError("valor vazio")
     m = _MONEY_RE.match(raw)
     if not m:
-        raise ValueError(f"valor invalido: {raw!r}")
+        raise ValueError(f"valor inválido: {raw!r}")
     sign = "-" if raw.startswith("-") else ""
     n = m.group(2)
     # decidir separador decimal: o ULTIMO de '.' ou ',' eh o decimal
@@ -110,7 +110,7 @@ def _parse_amount(raw: str) -> Decimal:
     try:
         return Decimal(sign + s)
     except InvalidOperation as e:
-        raise ValueError(f"valor invalido: {raw!r}") from e
+        raise ValueError(f"valor inválido: {raw!r}") from e
 
 
 def _categorize(description: str) -> str:
@@ -150,7 +150,7 @@ def parse_csv(content: bytes) -> ParseResult:
     try:
         header = next(reader)
     except StopIteration:
-        return ParseResult(rows=[], errors=[ParseError(line_number=1, message="csv vazio")])
+        return ParseResult(rows=[], errors=[ParseError(line_number=1, message="CSV vazio")])
 
     header_map = {_normalize_header(c): i for i, c in enumerate(header)}
     date_col = _find_column(header_map, "data", "date")
@@ -163,7 +163,7 @@ def parse_csv(content: bytes) -> ParseResult:
             errors=[
                 ParseError(
                     line_number=1,
-                    message="header invalido: colunas exigidas data, descricao, valor",
+                    message="cabeçalho inválido: colunas exigidas data, descrição, valor",
                 )
             ],
         )
@@ -177,10 +177,10 @@ def parse_csv(content: bytes) -> ParseResult:
             dt = _parse_date(raw_row[date_col])
             desc = raw_row[desc_col].strip()
             if not desc:
-                raise ValueError("descricao vazia")
+                raise ValueError("descrição vazia")
             amount = _parse_amount(raw_row[amount_col])
             if amount == 0:
-                raise ValueError("valor zero nao eh permitido")
+                raise ValueError("valor zero não é permitido")
             t = TransactionType.EXPENSE if amount < 0 else TransactionType.INCOME
             rows.append(
                 ParsedLine(

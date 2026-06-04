@@ -11,7 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.transactions.models import PaymentMethod, TransactionType
 
 
-class TransactionCreate(BaseModel):
+class TransactionBase(BaseModel):
+    """Campos comuns de entrada de uma transacao (S24-T03)."""
+
     account_id: int = Field(gt=0)
     category_id: int = Field(gt=0)
     type: TransactionType
@@ -20,6 +22,10 @@ class TransactionCreate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     payment_method: PaymentMethod | None = None
     is_recurring: bool = False
+
+
+class TransactionCreate(TransactionBase):
+    pass
 
 
 class TransactionUpdate(BaseModel):
@@ -36,19 +42,11 @@ class TransactionUpdate(BaseModel):
     is_recurring: bool | None = None
 
 
-class TransactionRead(BaseModel):
+class TransactionRead(TransactionBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
-    account_id: int
-    category_id: int
-    type: TransactionType
-    amount: Decimal
-    date: date_type
-    description: str | None
-    payment_method: PaymentMethod | None
-    is_recurring: bool
     created_at: datetime
 
 

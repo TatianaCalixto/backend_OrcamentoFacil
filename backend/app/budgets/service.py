@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.budgets.models import Budget
 from app.budgets.repository import BudgetRepository
@@ -27,21 +27,21 @@ class BudgetOwnershipError(Exception):
 
 
 class BudgetService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
         self.repo = BudgetRepository(db)
 
     # ----------------- ownership -----------------
 
-    def _category_of(self, user_id: int, category_id: int) -> Category:
-        cat = self.db.get(Category, category_id)
+    async def _category_of(self, user_id: int, category_id: int) -> Category:
+        cat = await self.db.get(Category, category_id)
         if cat is None or cat.user_id != user_id:
-            raise BudgetOwnershipError("category nao pertence ao usuario")
+            raise BudgetOwnershipError("categoria não pertence ao usuário")
         return cat
 
     # ----------------- calculo -----------------
 
-    def calculate_usage(self, budget: Budget) -> BudgetWithUsage:
+    async def calculate_usage(self, budget: Budget) -> BudgetWithUsage:
         first_day = date(budget.year, budget.month, 1)
         last_day = date(budget.year, budget.month, monthrange(budget.year, budget.month)[1])
 
@@ -52,7 +52,7 @@ class BudgetService:
             Transaction.date >= first_day,
             Transaction.date <= last_day,
         )
-        total = self.db.execute(stmt).scalar_one()
+        total = (await self.db.execute(stmt)).scalar_one()
         used = Decimal(total) if total is not None else Decimal("0")
 
         if budget.limit_amount > 0:
@@ -74,21 +74,24 @@ class BudgetService:
 
     # ----------------- list/get/create/update -----------------
 
-    def list_with_usage_for_month(
-        self, user_id: int, month: int, year: int
+    async def list_with_usage_for_month(
+        self, user_id: int, month: int, year: int, page: int = 1, page_size: int = 50
     ) -> list[BudgetWithUsage]:
         return [
-            self.calculate_usage(b) for b in self.repo.list_for_user_month(user_id, month, year)
+            await self.calculate_usage(b)
+            for b in await self.repo.list_for_user_month(
+                user_id, month, year, page=page, page_size=page_size
+            )
         ]
 
-    def get_with_usage(self, user_id: int, budget_id: int) -> BudgetWithUsage | None:
-        b = self.repo.get_for_user(user_id, budget_id)
+    async def get_with_usage(self, user_id: int, budget_id: int) -> BudgetWithUsage | None:
+        b = await self.repo.get_for_user(user_id, budget_id)
         if b is None:
             return None
-        return self.calculate_usage(b)
+        return await self.calculate_usage(b)
 
-    def create_for_user(self, user_id: int, payload: BudgetCreate) -> Budget:
-        self._category_of(user_id, payload.category_id)
+    async def create_for_user(self, user_id: int, payload: BudgetCreate) -> Budget:
+        await self._category_of(user_id, payload.category_id)
         budget = Budget(
             user_id=user_id,
             category_id=payload.category_id,
@@ -96,16 +99,18 @@ class BudgetService:
             year=payload.year,
             limit_amount=payload.limit_amount,
         )
-        return self.repo.add(budget)
+        return await self.repo.add(budget)
 
-    def update_for_user(self, user_id: int, budget_id: int, payload: BudgetUpdate) -> Budget | None:
-        b = self.repo.get_for_user(user_id, budget_id)
+    async def update_for_user(
+        self, user_id: int, budget_id: int, payload: BudgetUpdate
+    ) -> Budget | None:
+        b = await self.repo.get_for_user(user_id, budget_id)
         if b is None:
             return None
         updates = payload.model_dump(exclude_unset=True)
         for k, v in updates.items():
             setattr(b, k, v)
-        return self.repo.save(b)
+        return await self.repo.save(b)
 
 
 # helper para o router checar status enum no payload

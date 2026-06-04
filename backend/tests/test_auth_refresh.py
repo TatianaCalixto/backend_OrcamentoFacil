@@ -62,11 +62,11 @@ def test_refresh_token_nao_serve_como_access() -> None:
     assert r.status_code == 401
 
 
-def test_refresh_de_user_deletado_401() -> None:
+async def test_refresh_de_user_deletado_401() -> None:
     _a, refresh, uid = _register_login("a@ex.com")
-    with SessionLocal() as db:
-        u = db.get(User, uid)
-        db.delete(u)
-        db.commit()
+    async with SessionLocal() as db:
+        u = await db.get(User, uid)
+        await db.delete(u)
+        await db.commit()
     r = client.post("/auth/refresh", json={"refresh_token": refresh})
     assert r.status_code == 401

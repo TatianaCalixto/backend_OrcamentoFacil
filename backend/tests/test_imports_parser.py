@@ -27,7 +27,7 @@ def test_csv_vazio_retorna_erro() -> None:
 def test_header_faltando_colunas_retorna_erro() -> None:
     r = parse_csv(_b("foo,bar\n1,2\n"))
     assert r.rows == []
-    assert any("header invalido" in e.message for e in r.errors)
+    assert any("cabeçalho inválido" in e.message for e in r.errors)
 
 
 def test_parse_csv_minimo_virgula() -> None:

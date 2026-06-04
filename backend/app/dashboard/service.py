@@ -7,7 +7,7 @@ from datetime import date as date_type
 from decimal import Decimal
 
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.models import Account
 from app.categories.models import Category
@@ -29,12 +29,12 @@ def _month_range(month: int, year: int) -> tuple[date_type, date_type]:
 
 
 class DashboardService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     # ------------------ monthly summary ------------------
 
-    def monthly_summary(self, user_id: int, month: int, year: int) -> MonthlySummary:
+    async def monthly_summary(self, user_id: int, month: int, year: int) -> MonthlySummary:
         first, last = _month_range(month, year)
 
         # somas por tipo, num unico select
@@ -56,7 +56,7 @@ class DashboardService:
             Transaction.date >= first,
             Transaction.date <= last,
         )
-        receita, despesa = self.db.execute(sum_stmt).one()
+        receita, despesa = (await self.db.execute(sum_stmt)).one()
         receita = Decimal(receita)
         despesa = Decimal(despesa)
         saldo = receita - despesa
@@ -69,7 +69,7 @@ class DashboardService:
         )
         contas = [
             AccountBalance(account_id=row[0], name=row[1], current_balance=row[2])
-            for row in self.db.execute(acc_stmt).all()
+            for row in (await self.db.execute(acc_stmt)).all()
         ]
 
         return MonthlySummary(
@@ -83,7 +83,7 @@ class DashboardService:
 
     # ------------------ category breakdown ------------------
 
-    def category_breakdown(self, user_id: int, month: int, year: int) -> CategoryBreakdown:
+    async def category_breakdown(self, user_id: int, month: int, year: int) -> CategoryBreakdown:
         first, last = _month_range(month, year)
 
         stmt = (
@@ -107,13 +107,13 @@ class DashboardService:
             CategoryBreakdownItem(
                 category_id=row[0], name=row[1], color=row[2], total=Decimal(row[3])
             )
-            for row in self.db.execute(stmt).all()
+            for row in (await self.db.execute(stmt)).all()
         ]
         return CategoryBreakdown(month=month, year=year, items=items)
 
     # ------------------ cashflow ------------------
 
-    def cashflow(self, user_id: int, date_from: date_type, date_to: date_type) -> Cashflow:
+    async def cashflow(self, user_id: int, date_from: date_type, date_to: date_type) -> Cashflow:
         # somas por dia
         stmt = (
             select(
@@ -147,7 +147,7 @@ class DashboardService:
         )
         acumulado = Decimal("0")
         points: list[CashflowPoint] = []
-        for row in self.db.execute(stmt).all():
+        for row in (await self.db.execute(stmt)).all():
             rec = Decimal(row[1])
             desp = Decimal(row[2])
             acumulado += rec - desp

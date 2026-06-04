@@ -3,34 +3,45 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.budgets.models import Budget
 
 
 class BudgetRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def get_for_user(self, user_id: int, budget_id: int) -> Budget | None:
+    async def get_for_user(self, user_id: int, budget_id: int) -> Budget | None:
         stmt = select(Budget).where(Budget.user_id == user_id, Budget.id == budget_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return (await self.db.execute(stmt)).scalar_one_or_none()
 
-    def list_for_user_month(self, user_id: int, month: int, year: int) -> list[Budget]:
+    async def list_for_user_month(
+        self,
+        user_id: int,
+        month: int,
+        year: int,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> list[Budget]:
+        # order_by(id): mais antigos primeiro (S24-T06). Paginacao opcional;
+        # default page_size=50 cobre os casos reais (poucos budgets por mes).
         stmt = (
             select(Budget)
             .where(Budget.user_id == user_id, Budget.month == month, Budget.year == year)
             .order_by(Budget.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list((await self.db.execute(stmt)).scalars().all())
 
-    def add(self, budget: Budget) -> Budget:
+    async def add(self, budget: Budget) -> Budget:
         self.db.add(budget)
-        self.db.commit()
-        self.db.refresh(budget)
+        await self.db.flush()
+        await self.db.refresh(budget)
         return budget
 
-    def save(self, budget: Budget) -> Budget:
-        self.db.commit()
-        self.db.refresh(budget)
+    async def save(self, budget: Budget) -> Budget:
+        await self.db.flush()
+        await self.db.refresh(budget)
         return budget

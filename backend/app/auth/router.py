@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
 from app.auth.jwt import (
@@ -40,16 +40,18 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "e retorna o UserRead. Email duplicado retorna 409.",
 )
 @limiter.limit("10/minute")
-def register(
+async def register(
     request: Request,  # noqa: ARG001 — exigido pelo slowapi
     payload: UserCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    existing = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+    existing = (
+        await db.execute(select(User).where(User.email == payload.email))
+    ).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="email ja cadastrado",
+            detail="email já cadastrado",
         )
     user = User(
         name=payload.name,
@@ -57,9 +59,9 @@ def register(
         password_hash=hash_password(payload.password),
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
-    seed_default_categories(db, user.id)
+    await db.flush()
+    await db.refresh(user)
+    await seed_default_categories(db, user.id)
     return user
 
 
@@ -71,16 +73,16 @@ def register(
     "Em falha retorna 401 com header WWW-Authenticate: Bearer.",
 )
 @limiter.limit("10/minute")
-def login(
+async def login(
     request: Request,  # noqa: ARG001
     payload: LoginRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
-    user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="credenciais invalidas",
+            detail="credenciais inválidas",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return TokenResponse(
@@ -96,10 +98,10 @@ def login(
     description="Recebe {refresh_token}. Se valido (typ=refresh, nao expirado, "
     "assinatura ok, usuario ainda existe), retorna novo par; senao 401.",
 )
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     unauth = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="refresh token invalido",
+        detail="refresh token inválido",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -111,9 +113,9 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
         raise unauth
     # refresh revogado (logout) nao pode emitir novo par (S20-T05).
     jti = claims.get("jti")
-    if jti and is_revoked(db, jti):
+    if jti and await is_revoked(db, jti):
         raise unauth
-    user = db.get(User, int(sub))
+    user = await db.get(User, int(sub))
     if user is None:
         raise unauth
     return TokenResponse(
@@ -129,10 +131,10 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenResp
     "jti, impedindo emissao de novos tokens a partir dele. Idempotente: refresh "
     "invalido/expirado ou sem jti retorna 200 sem erro.",
 )
-def logout(
+async def logout(
     payload: RefreshRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     try:
         claims = decode_token(payload.refresh_token, expected_typ="refresh")
@@ -142,13 +144,13 @@ def logout(
     if str(claims.get("sub")) != str(current_user.id):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="refresh token nao pertence ao usuario autenticado",
+            detail="refresh token não pertence ao usuário autenticado",
             headers={"WWW-Authenticate": "Bearer"},
         )
     jti = claims.get("jti")
     if not jti:
         return {"detail": "refresh sem jti (token antigo); nada a revogar"}
-    revoke(db, jti, current_user.id)
+    await revoke(db, jti, current_user.id)
     # limpeza oportunistica de registros ja expirados (cleanup on-demand)
-    cleanup_expired(db)
+    await cleanup_expired(db)
     return {"detail": "logout efetuado"}

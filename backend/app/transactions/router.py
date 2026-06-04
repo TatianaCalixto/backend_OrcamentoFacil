@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
 from app.core.ratelimit import limiter
@@ -23,7 +23,7 @@ from app.users.models import User
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
-_NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="transacao nao encontrada")
+_NOT_FOUND = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="transação não encontrada")
 
 
 def _handle_ownership(exc: OwnershipError) -> HTTPException:
@@ -32,7 +32,7 @@ def _handle_ownership(exc: OwnershipError) -> HTTPException:
 
 
 @router.get("", response_model=TransactionPage)
-def list_transactions(
+async def list_transactions(
     date_from: date_type | None = Query(default=None),
     date_to: date_type | None = Query(default=None),
     account_id: int | None = Query(default=None, gt=0),
@@ -43,7 +43,7 @@ def list_transactions(
     page_size: int = Query(default=20, ge=1, le=200),
     order_by: str = Query(default="-date"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> TransactionPage:
     filters = TransactionFilters(
         date_from=date_from,
@@ -53,7 +53,7 @@ def list_transactions(
         type=type,
         search=search,
     )
-    items, total = TransactionService(db).list_paginated(
+    items, total = await TransactionService(db).list_paginated(
         current_user.id, filters, page, page_size, order_by
     )
     return TransactionPage(
@@ -66,25 +66,25 @@ def list_transactions(
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
 @limiter.limit("60/minute")
-def create_transaction(
+async def create_transaction(
     request: Request,  # noqa: ARG001 — exigido pelo slowapi
     payload: TransactionCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return TransactionService(db).create_for_user(current_user.id, payload)
+        return await TransactionService(db).create_for_user(current_user.id, payload)
     except OwnershipError as e:
         raise _handle_ownership(e) from e
 
 
 @router.get("/{txn_id}", response_model=TransactionRead)
-def get_transaction(
+async def get_transaction(
     txn_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    t = TransactionService(db).get_for_user(current_user.id, txn_id)
+    t = await TransactionService(db).get_for_user(current_user.id, txn_id)
     if t is None:
         raise _NOT_FOUND
     return t
@@ -92,15 +92,15 @@ def get_transaction(
 
 @router.patch("/{txn_id}", response_model=TransactionRead)
 @limiter.limit("60/minute")
-def update_transaction(
+async def update_transaction(
     request: Request,  # noqa: ARG001 — exigido pelo slowapi
     txn_id: int,
     payload: TransactionUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        t = TransactionService(db).update_for_user(current_user.id, txn_id, payload)
+        t = await TransactionService(db).update_for_user(current_user.id, txn_id, payload)
     except OwnershipError as e:
         raise _handle_ownership(e) from e
     if t is None:
@@ -110,11 +110,11 @@ def update_transaction(
 
 @router.delete("/{txn_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("60/minute")
-def delete_transaction(
+async def delete_transaction(
     request: Request,  # noqa: ARG001 — exigido pelo slowapi
     txn_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> None:
-    if not TransactionService(db).delete_for_user(current_user.id, txn_id):
+    if not await TransactionService(db).delete_for_user(current_user.id, txn_id):
         raise _NOT_FOUND

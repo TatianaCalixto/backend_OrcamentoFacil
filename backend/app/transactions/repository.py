@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date as date_type
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.transactions.models import Transaction, TransactionType
 
@@ -32,12 +32,12 @@ _ALLOWED_ORDER = {
 
 
 class TransactionRepository:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def get_for_user(self, user_id: int, txn_id: int) -> Transaction | None:
+    async def get_for_user(self, user_id: int, txn_id: int) -> Transaction | None:
         stmt = select(Transaction).where(Transaction.user_id == user_id, Transaction.id == txn_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        return (await self.db.execute(stmt)).scalar_one_or_none()
 
     def _base_stmt(self, user_id: int, filters: TransactionFilters):
         stmt = select(Transaction).where(Transaction.user_id == user_id)
@@ -55,12 +55,12 @@ class TransactionRepository:
             stmt = stmt.where(Transaction.description.ilike(f"%{filters.search}%"))
         return stmt
 
-    def count(self, user_id: int, filters: TransactionFilters) -> int:
+    async def count(self, user_id: int, filters: TransactionFilters) -> int:
         stmt = self._base_stmt(user_id, filters)
         count_stmt = select(func.count()).select_from(stmt.subquery())
-        return int(self.db.execute(count_stmt).scalar_one())
+        return int((await self.db.execute(count_stmt)).scalar_one())
 
-    def list_paginated(
+    async def list_paginated(
         self,
         user_id: int,
         filters: TransactionFilters,
@@ -75,8 +75,8 @@ class TransactionRepository:
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
-        return list(self.db.execute(stmt).scalars().all())
+        return list((await self.db.execute(stmt)).scalars().all())
 
-    def list_by_user(self, user_id: int) -> list[Transaction]:
+    async def list_by_user(self, user_id: int) -> list[Transaction]:
         """Compatibilidade: lista sem filtros, com ordem padrao."""
-        return self.list_paginated(user_id, TransactionFilters(), page=1, page_size=10_000)
+        return await self.list_paginated(user_id, TransactionFilters(), page=1, page_size=10_000)

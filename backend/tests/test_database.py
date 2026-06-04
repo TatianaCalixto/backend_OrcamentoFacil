@@ -1,69 +1,84 @@
-"""Testes da camada de banco: engine/session/get_db (S01-T03)."""
+"""Testes da camada de banco: engine/session/get_db (S01-T03; async em S24-T01)."""
 
 from __future__ import annotations
 
-from collections.abc import Generator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import SessionLocal, get_db
 
 
-def test_session_executa_select_1() -> None:
-    with SessionLocal() as db:
-        result = db.execute(text("SELECT 1")).scalar_one()
+async def test_session_executa_select_1() -> None:
+    async with SessionLocal() as db:
+        result = (await db.execute(text("SELECT 1"))).scalar_one()
     assert result == 1
 
 
-def test_get_db_cede_session_que_executa_select_1() -> None:
-    gen: Generator[Session, None, None] = get_db()
-    db = next(gen)
+async def test_get_db_cede_session_que_executa_select_1() -> None:
+    gen = get_db()
+    db = await gen.__anext__()
     try:
-        assert isinstance(db, Session)
-        assert db.execute(text("SELECT 1")).scalar_one() == 1
+        assert isinstance(db, AsyncSession)
+        assert (await db.execute(text("SELECT 1"))).scalar_one() == 1
     finally:
-        # encerra o generator (executa o finally interno -> close)
-        with pytest.raises(StopIteration):
-            next(gen)
+        # esgota o async generator (executa o finally interno -> close via async with)
+        with pytest.raises(StopAsyncIteration):
+            await gen.__anext__()
 
 
-def test_get_db_faz_rollback_em_erro(monkeypatch: pytest.MonkeyPatch) -> None:
+class _FakeAsyncCM:
+    """Context manager async falso, no formato que `async with SessionLocal()`
+    espera: __aenter__ cede a session; __aexit__ delega a um mock awaitable."""
+
+    def __init__(self, session, aexit) -> None:
+        self._session = session
+        self._aexit = aexit
+
+    async def __aenter__(self):
+        return self._session
+
+    async def __aexit__(self, *args):
+        return await self._aexit(*args)
+
+
+async def test_get_db_faz_rollback_em_erro(monkeypatch: pytest.MonkeyPatch) -> None:
     """Quando uma excecao ocorre dentro do bloco que usa a session,
     get_db deve chamar rollback antes de propagar."""
-    fake_session = MagicMock(spec=Session)
+    fake_session = MagicMock(spec=AsyncSession)
+    fake_session.rollback = AsyncMock()
+    cm = _FakeAsyncCM(fake_session, AsyncMock(return_value=False))
 
-    def fake_session_factory() -> MagicMock:
-        return fake_session
-
-    monkeypatch.setattr("app.database.session.SessionLocal", fake_session_factory)
-    # reimporta get_db apos o patch para resolver SessionLocal localmente:
+    monkeypatch.setattr("app.database.session.SessionLocal", lambda: cm)
     from app.database import session as session_mod
 
     gen = session_mod.get_db()
-    yielded = next(gen)
+    yielded = await gen.__anext__()
     assert yielded is fake_session
 
     with pytest.raises(RuntimeError, match="boom"):
-        gen.throw(RuntimeError("boom"))
+        await gen.athrow(RuntimeError("boom"))
 
-    fake_session.rollback.assert_called_once()
-    fake_session.close.assert_called_once()
+    fake_session.rollback.assert_awaited_once()
 
 
-def test_get_db_fecha_session_no_caminho_feliz(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No caminho feliz, get_db deve fechar a session (sem rollback)."""
-    fake_session = MagicMock(spec=Session)
+async def test_get_db_fecha_session_no_caminho_feliz(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No caminho feliz, get_db deve sair do context manager (close via __aexit__)
+    sem chamar rollback."""
+    fake_session = MagicMock(spec=AsyncSession)
+    fake_session.rollback = AsyncMock()
+    aexit = AsyncMock(return_value=False)
+    cm = _FakeAsyncCM(fake_session, aexit)
 
-    monkeypatch.setattr("app.database.session.SessionLocal", lambda: fake_session)
+    monkeypatch.setattr("app.database.session.SessionLocal", lambda: cm)
     from app.database import session as session_mod
 
     gen = session_mod.get_db()
-    next(gen)
-    with pytest.raises(StopIteration):
-        next(gen)
+    await gen.__anext__()
+    with pytest.raises(StopAsyncIteration):
+        await gen.__anext__()
 
-    fake_session.close.assert_called_once()
+    aexit.assert_awaited_once()
     fake_session.rollback.assert_not_called()

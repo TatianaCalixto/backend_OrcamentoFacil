@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.categories.models import Category, CategoryType
 
@@ -19,7 +19,7 @@ DEFAULT_CATEGORIES: list[tuple[str, CategoryType, str, str]] = [
 ]
 
 
-def seed_default_categories(db: Session, user_id: int) -> list[Category]:
+async def seed_default_categories(db: AsyncSession, user_id: int) -> list[Category]:
     """Cria as categorias padrao para um usuario recem-registrado.
 
     Idempotente: nao recria categorias que ja existam com mesmo name+user.
@@ -28,8 +28,12 @@ def seed_default_categories(db: Session, user_id: int) -> list[Category]:
 
     existentes = {
         row[0]
-        for row in db.execute(
-            select(Category.name).where(Category.user_id == user_id, Category.is_default.is_(True))
+        for row in (
+            await db.execute(
+                select(Category.name).where(
+                    Category.user_id == user_id, Category.is_default.is_(True)
+                )
+            )
         ).all()
     }
 
@@ -50,7 +54,7 @@ def seed_default_categories(db: Session, user_id: int) -> list[Category]:
 
     if novas:
         db.add_all(novas)
-        db.commit()
+        await db.flush()
         for c in novas:
-            db.refresh(c)
+            await db.refresh(c)
     return novas

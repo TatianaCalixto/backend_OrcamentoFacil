@@ -7,7 +7,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts.models import Account
 from app.categories.models import Category
@@ -27,24 +27,24 @@ class CsvImportOwnershipError(Exception):
 
 
 class CsvImportService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def _account_of(self, user_id: int, account_id: int) -> Account:
-        acc = self.db.get(Account, account_id)
+    async def _account_of(self, user_id: int, account_id: int) -> Account:
+        acc = await self.db.get(Account, account_id)
         if acc is None or acc.user_id != user_id:
-            raise CsvImportOwnershipError("account nao pertence ao usuario")
+            raise CsvImportOwnershipError("conta não pertence ao usuário")
         return acc
 
-    def _user_categories_by_name(self, user_id: int) -> dict[str, Category]:
+    async def _user_categories_by_name(self, user_id: int) -> dict[str, Category]:
         stmt = select(Category).where(Category.user_id == user_id)
-        return {c.name: c for c in self.db.execute(stmt).scalars().all()}
+        return {c.name: c for c in (await self.db.execute(stmt)).scalars().all()}
 
-    def import_csv(self, user_id: int, account_id: int, content: bytes) -> ImportResult:
-        account = self._account_of(user_id, account_id)
+    async def import_csv(self, user_id: int, account_id: int, content: bytes) -> ImportResult:
+        account = await self._account_of(user_id, account_id)
         parsed: ParseResult = parse_csv(content)
 
-        categorias = self._user_categories_by_name(user_id)
+        categorias = await self._user_categories_by_name(user_id)
 
         novas: list[Transaction] = []
         skipped_errors: list[ParseError] = list(parsed.errors)
@@ -59,8 +59,8 @@ class CsvImportService:
                     ParseError(
                         line_number=line.line_number,
                         message=(
-                            f"categoria '{line.suggested_category_name}' e fallback "
-                            f"'{FALLBACK_CATEGORY_NAME}' nao existem para o usuario"
+                            f"categoria '{line.suggested_category_name}' e a categoria "
+                            f"padrão '{FALLBACK_CATEGORY_NAME}' não existem para o usuário"
                         ),
                     )
                 )
@@ -77,16 +77,13 @@ class CsvImportService:
             novas.append(txn)
             delta += line.amount if line.type == TransactionType.INCOME else -line.amount
 
-        try:
-            if novas:
-                self.db.add_all(novas)
-                account.current_balance = account.current_balance + delta
-                self.db.commit()
-                for n in novas:
-                    self.db.refresh(n)
-        except Exception:
-            self.db.rollback()
-            raise
+        # UoW (S24-T02): apenas flush; o commit/rollback fica na borda (get_db).
+        if novas:
+            self.db.add_all(novas)
+            account.current_balance = account.current_balance + delta
+            await self.db.flush()
+            for n in novas:
+                await self.db.refresh(n)
 
         return ImportResult(
             created_count=len(novas),

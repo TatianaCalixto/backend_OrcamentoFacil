@@ -9,6 +9,9 @@ import pandas as pd
 import streamlit as st
 
 import api
+from components.filters_bar import filters_bar
+from components.transaction_form import transaction_form
+from services import accounts_service, categories_service, transactions_service
 from ui import filter_categories_by_type, render_header
 
 st.set_page_config(page_title="Transacoes — OrcaFacil", layout="wide")
@@ -26,8 +29,8 @@ st.title("Transacoes")
 
 # ----- carregar listas auxiliares -----
 try:
-    accounts = api.list_accounts(token, base_url=api_base)
-    categories = api.list_categories(token, base_url=api_base)
+    accounts = accounts_service.list_accounts(token, base_url=api_base)
+    categories = categories_service.list_categories(token, base_url=api_base)
 except api.ApiError as e:
     st.error(f"Erro ao carregar dados auxiliares: {e.detail}")
     st.stop()
@@ -35,29 +38,49 @@ except api.ApiError as e:
 acc_label = {0: "(todas)"} | {a["id"]: a["name"] for a in accounts}
 cat_label = {0: "(todas)"} | {c["id"]: c["name"] for c in categories}
 
-# ----- filtros -----
+# ----- filtros (persistidos em session_state, via filters_bar) -----
 today = date.today()
 default_from = today.replace(day=1)
 
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    date_from = st.date_input("De", value=default_from)
-with c2:
-    date_to = st.date_input("Ate", value=today)
-with c3:
-    type_sel = st.selectbox("Tipo", options=["", "income", "expense"], format_func=lambda v: v or "(todos)")
-with c4:
-    search = st.text_input("Busca (descricao)")
-
-c5, c6 = st.columns(2)
-with c5:
-    acc_id = st.selectbox(
-        "Conta", options=list(acc_label.keys()), format_func=lambda i: acc_label[i]
-    )
-with c6:
-    cat_id = st.selectbox(
-        "Categoria", options=list(cat_label.keys()), format_func=lambda i: cat_label[i]
-    )
+filtros = filters_bar(
+    [
+        {"key": "date_from", "label": "De", "kind": "date", "default": default_from},
+        {"key": "date_to", "label": "Ate", "kind": "date", "default": today},
+        {
+            "key": "type",
+            "label": "Tipo",
+            "kind": "select",
+            "default": "",
+            "options": ["", "income", "expense"],
+            "format_func": lambda v: v or "(todos)",
+        },
+        {"key": "search", "label": "Busca (descricao)", "kind": "text", "default": ""},
+        {
+            "key": "account_id",
+            "label": "Conta",
+            "kind": "select",
+            "default": 0,
+            "options": list(acc_label.keys()),
+            "format_func": lambda i: acc_label[i],
+        },
+        {
+            "key": "category_id",
+            "label": "Categoria",
+            "kind": "select",
+            "default": 0,
+            "options": list(cat_label.keys()),
+            "format_func": lambda i: cat_label[i],
+        },
+    ],
+    state_key="transactions_filters",
+    n_cols=4,
+)
+date_from = filtros["date_from"]
+date_to = filtros["date_to"]
+type_sel = filtros["type"]
+search = filtros["search"]
+acc_id = filtros["account_id"]
+cat_id = filtros["category_id"]
 
 # ----- buscar transacoes (paginas para nao perder dados) -----
 @st.cache_data(show_spinner=False, ttl=60)
@@ -69,7 +92,7 @@ def _fetch_all(
     items: list[dict] = []
     page = 1
     while True:
-        resp = api.list_transactions(
+        resp = transactions_service.list_transactions(
             token,
             page=page, page_size=200,
             date_from=date_from, date_to=date_to,
@@ -148,17 +171,6 @@ with col_xlsx:
 
 # ----- editar transacao (S18-T02) -----
 
-PAYMENT_OPTIONS = ["", "cash", "debit", "credit", "pix", "transfer", "other"]
-PAYMENT_LABELS = {
-    "": "(nao informado)",
-    "cash": "Dinheiro",
-    "debit": "Debito",
-    "credit": "Credito",
-    "pix": "Pix",
-    "transfer": "Transferencia",
-    "other": "Outro",
-}
-
 
 def _tx_label(tx: dict) -> str:
     return f"{tx['date']} | {tx.get('description') or '(sem descricao)'} | {tx['amount']}"
@@ -176,7 +188,18 @@ edit_id = st.selectbox(
 )
 current = tx_by_id[edit_id]
 cur_type = current.get("type", "expense")
-ed_cats = filter_categories_by_type(categories, cur_type)
+
+# Tipo fica FORA do form para filtrar categorias de forma reativa (S26-T03).
+# A key inclui edit_id para reinicializar ao trocar a transacao selecionada.
+ed_type = st.radio(
+    "Tipo",
+    options=["income", "expense"],
+    index=0 if cur_type == "income" else 1,
+    horizontal=True,
+    format_func=lambda v: "Receita" if v == "income" else "Despesa",
+    key=f"edit_tx_type_{edit_id}",
+)
+ed_cats = filter_categories_by_type(categories, ed_type)
 if not ed_cats:
     # fallback: usa todas as categorias se nenhuma do tipo for encontrada
     ed_cats = list(categories)
@@ -193,76 +216,27 @@ cur_payment = current.get("payment_method") or ""
 cur_description = current.get("description") or ""
 cur_recurring = bool(current.get("is_recurring", False))
 
-with st.form("form_editar_transacao"):
-    ed_type = st.radio(
-        "Tipo",
-        options=["income", "expense"],
-        index=0 if cur_type == "income" else 1,
-        horizontal=True,
-        format_func=lambda v: "Receita" if v == "income" else "Despesa",
-    )
-    ed_amount = st.number_input(
-        "Valor",
-        min_value=0.0,
-        step=0.01,
-        format="%.2f",
-        value=cur_amount,
-    )
-    ed_date = st.date_input("Data", value=cur_date)
-    acc_options = [a["id"] for a in accounts]
-    try:
-        acc_idx = acc_options.index(cur_account_id)
-    except ValueError:
-        acc_idx = 0
-    ed_account = st.selectbox(
-        "Conta",
-        options=acc_options,
-        index=acc_idx,
-        format_func=lambda i: next(
-            (a["name"] for a in accounts if a["id"] == i), str(i)
-        ),
-    )
-    cat_options = [c["id"] for c in ed_cats]
-    try:
-        cat_idx = cat_options.index(cur_category_id)
-    except ValueError:
-        cat_idx = 0
-    ed_category = st.selectbox(
-        "Categoria",
-        options=cat_options,
-        index=cat_idx if cat_options else 0,
-        format_func=lambda i: next(
-            (c["name"] for c in ed_cats if c["id"] == i), str(i)
-        ),
-    )
-    ed_description = st.text_input("Descricao", value=cur_description)
-    try:
-        pay_idx = PAYMENT_OPTIONS.index(cur_payment)
-    except ValueError:
-        pay_idx = 0
-    ed_payment = st.selectbox(
-        "Forma de pagamento",
-        options=PAYMENT_OPTIONS,
-        index=pay_idx,
-        format_func=lambda v: PAYMENT_LABELS[v],
-    )
-    ed_recurring = st.checkbox("Recorrente", value=cur_recurring)
-    submit_edit = st.form_submit_button("Salvar")
+submit_edit, edit_values = transaction_form(
+    accounts=accounts,
+    categories=ed_cats,
+    type_value=ed_type,
+    initial={
+        "amount": cur_amount,
+        "date": cur_date,
+        "account_id": cur_account_id,
+        "category_id": cur_category_id,
+        "description": cur_description,
+        "payment_method": cur_payment,
+        "is_recurring": cur_recurring,
+    },
+    submit_label="Salvar",
+    form_key=f"form_editar_transacao_{edit_id}",
+)
 
-if submit_edit:
+if submit_edit and edit_values is not None:
     try:
-        api.update_transaction(
-            token,
-            edit_id,
-            account_id=int(ed_account),
-            category_id=int(ed_category),
-            type=ed_type,
-            amount=float(ed_amount),
-            date=ed_date.isoformat(),
-            description=ed_description.strip() or None,
-            payment_method=ed_payment or None,
-            is_recurring=bool(ed_recurring),
-            base_url=api_base,
+        transactions_service.update_transaction(
+            token, edit_id, base_url=api_base, **edit_values
         )
         st.success("Transacao atualizada")
         st.rerun()
@@ -288,7 +262,7 @@ confirmado = st.checkbox(
 
 if st.button("Excluir", type="primary", disabled=not confirmado, key="btn_delete_tx"):
     try:
-        api.delete_transaction(token, int(del_id), base_url=api_base)
+        transactions_service.delete_transaction(token, int(del_id), base_url=api_base)
         st.success("Transacao excluida")
         st.rerun()
     except api.ApiError as e:

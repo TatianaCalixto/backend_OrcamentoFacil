@@ -33,12 +33,12 @@ def _create_account(token: str, name: str = "Conta") -> int:
     return r.json()["id"]
 
 
-def _income_category(user_id: int) -> int:
+async def _income_category(user_id: int) -> int:
     """Cria uma categoria income para o user (defaults sao todas expense)."""
-    with SessionLocal() as db:
+    async with SessionLocal() as db:
         cat = Category(user_id=user_id, name="Salario", type="income")
         db.add(cat)
-        db.commit()
+        await db.commit()
         return cat.id
 
 
@@ -49,19 +49,19 @@ def _expense_category_id(token: str) -> int:
 
 
 @pytest.fixture
-def setup_user_a():
+async def setup_user_a():
     token, uid = _register("a@ex.com")
     acc = _create_account(token, "C1")
-    cat_in = _income_category(uid)
+    cat_in = await _income_category(uid)
     cat_ex = _expense_category_id(token)
     return {"token": token, "uid": uid, "acc": acc, "cat_in": cat_in, "cat_ex": cat_ex}
 
 
 @pytest.fixture
-def setup_user_b():
+async def setup_user_b():
     token, uid = _register("b@ex.com")
     acc = _create_account(token, "B1")
-    cat_in = _income_category(uid)
+    cat_in = await _income_category(uid)
     return {"token": token, "uid": uid, "acc": acc, "cat_in": cat_in}
 
 

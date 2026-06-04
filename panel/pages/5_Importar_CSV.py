@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 import api
+from services import accounts_service, transactions_service
 from ui import render_header
 
 st.set_page_config(page_title="Importar CSV - OrcaFacil", layout="wide")
@@ -26,7 +27,7 @@ st.write(
 )
 
 try:
-    accounts = api.list_accounts(token, base_url=api_base)
+    accounts = accounts_service.list_accounts(token, base_url=api_base)
 except api.ApiError as e:
     st.error(f"Erro ao carregar contas: {e.detail}")
     st.stop()
@@ -54,6 +55,8 @@ if st.button("Importar", type="primary", disabled=disabled):
             file_bytes=upload.getvalue(),
             base_url=api_base,
         )
+        transactions_service.clear_cache()
+        accounts_service.clear_cache()
     except api.ApiError as e:
         st.error(e.detail)
     else:
