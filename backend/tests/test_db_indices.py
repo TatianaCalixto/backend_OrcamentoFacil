@@ -54,8 +54,21 @@ def test_migracao_reversivel_em_sqlite_limpo(tmp_path) -> None:
 
 
 async def _query_plan(sql: str) -> str:
+    """Plano de execucao da query, agnostico de dialeto.
+
+    - SQLite: `EXPLAIN QUERY PLAN` (sintaxe propria do SQLite).
+    - PostgreSQL: `EXPLAIN`. Em tabela vazia o planner prefere seq scan, entao
+      desabilitamos seqscan na sessao para validar que o indice ESTA disponivel
+      e seria usado (`SET enable_seqscan = off`). `EXPLAIN QUERY PLAN` nao existe
+      no Postgres e causava `syntax error at or near "QUERY"` no CI.
+    """
     async with SessionLocal() as db:
-        rows = (await db.execute(text("EXPLAIN QUERY PLAN " + sql))).all()
+        if db.bind.dialect.name == "postgresql":
+            await db.execute(text("SET enable_seqscan = off"))
+            stmt = text("EXPLAIN " + sql)
+        else:  # sqlite (suite local)
+            stmt = text("EXPLAIN QUERY PLAN " + sql)
+        rows = (await db.execute(stmt)).all()
     return " | ".join(str(tuple(r)) for r in rows)
 
 
