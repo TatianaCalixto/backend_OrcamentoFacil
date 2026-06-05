@@ -19,6 +19,12 @@ updates:
         dependency-type: "production"
       dev:
         dependency-type: "development"
+    ignore:
+      # passlib 1.7.4 (sem manutenção) quebra com bcrypt >= 4.1 (remoção de
+      # __about__). Mantemos bcrypt < 4.1 enquanto não trocamos passlib por
+      # bcrypt direto. Ver PR #6 (fechado) e requirements.txt.
+      - dependency-name: "bcrypt"
+        versions: [">=4.1"]
 
   # --- Painel (Streamlit) — pip ---
   - package-ecosystem: "pip"
