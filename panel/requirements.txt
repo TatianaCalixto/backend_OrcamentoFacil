@@ -1,8 +1,14 @@
 # OrçaFácil — Painel Web Streamlit (Sprint 15)
 # Python 3.12+ obrigatório.
+#
+# Versões FIXAS (==) para builds reprodutíveis — mesmo critério do
+# backend/requirements.txt: com faixas abertas (>=), cada instalação resolvia
+# um conjunto diferente e o CI divergia do ambiente local. O Dependabot
+# continua propondo as atualizações; o pin só garante que todo mundo instale
+# exatamente o mesmo conjunto. Conjunto validado: 45 testes do painel passando.
 
-streamlit>=1.58.0
-requests>=2.34.2
-pandas>=3.0.3
-plotly>=6.8.0
-openpyxl>=3.1.5  # exportação XLSX
+streamlit==1.60.0
+requests==2.34.2
+pandas==3.0.5
+plotly==6.9.0
+openpyxl==3.1.5  # exportação XLSX
