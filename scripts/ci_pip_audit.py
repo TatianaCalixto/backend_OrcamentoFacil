@@ -39,8 +39,22 @@ FAIL_SEVERITIES = {"CRITICAL", "HIGH"}
 WARN_SEVERITIES = {"MODERATE", "MEDIUM", "LOW"}
 HTTP_TIMEOUT = 15
 
+# Allowlist de vulnerabilidades aceitas conscientemente: ID -> justificativa.
+# Regra: toda entrada precisa de justificativa escrita e deve ser revisada
+# quando o upstream publicar uma fix version. As ignoradas continuam sendo
+# impressas no relatorio do CI — o gate silencia a falha, nunca o registro.
+ALLOWLIST: dict[str, str] = {
+    "PYSEC-2026-1325": (
+        "ecdsa: entra apenas como dependencia transitiva de python-jose. "
+        "O OrcaFacil assina e valida JWT com HS256 (HMAC, ver "
+        "app/core/config.py:jwt_algorithm), portanto o codigo ECDSA "
+        "vulneravel nunca e exercitado. Sem fix version publicada pelo "
+        "upstream. Revisar se o projeto passar a usar ES256/RS256."
+    ),
+}
 
-def run_pip_audit(requirement: str) -> list[dict]:
+
+def run_pip_audit(requirement: str, ignore_ids: list[str] | None = None) -> list[dict]:
     """Roda pip-audit em JSON e devolve a lista de dependências auditadas.
 
     pip-audit retorna exit code != 0 quando encontra vulnerabilidades — isso é
@@ -52,6 +66,8 @@ def run_pip_audit(requirement: str) -> list[dict]:
         "-r", requirement,
         "-f", "json",
     ]
+    for vuln_id in ignore_ids or []:
+        cmd += ["--ignore-vuln", vuln_id]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     out = proc.stdout.strip()
     if not out:
@@ -115,9 +131,17 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="pip-audit com gate por severidade (OSV).")
     parser.add_argument("-r", "--requirement", required=True, help="arquivo requirements.txt")
+    parser.add_argument(
+        "--ignore-vuln",
+        action="append",
+        default=[],
+        metavar="ID",
+        help="ID extra a ignorar, alem da ALLOWLIST do script (repetivel).",
+    )
     args = parser.parse_args()
 
-    deps = run_pip_audit(args.requirement)
+    ignored = {**ALLOWLIST, **{vid: "informado via --ignore-vuln" for vid in args.ignore_vuln}}
+    deps = run_pip_audit(args.requirement, list(ignored))
 
     failures: list[tuple] = []
     warnings: list[tuple] = []
@@ -146,6 +170,11 @@ def main() -> int:
     print("=" * 72)
     print(f"pip-audit + gate de severidade (OSV) — {total_vulns} vulnerabilidade(s) bruta(s)")
     print("=" * 72)
+
+    if ignored:
+        print(f"\nIGNORADAS por allowlist ({len(ignored)}) — risco aceito e justificado:")
+        for vid, motivo in ignored.items():
+            print(f"  [IGNORADA] {vid}\n             {motivo}")
 
     if warnings:
         _print("WARNINGS (Medium/Low — não falham o CI)", warnings)
