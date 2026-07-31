@@ -8,11 +8,11 @@
 # Conjunto validado: 294 testes, cobertura 96%.
 
 # --- Runtime ---
-fastapi==0.139.2
+fastapi==0.140.7
 uvicorn==0.51.0
 python-multipart==0.0.32  # para multipart/form-data (upload de CSV em S09)
 slowapi==0.1.10  # rate limiting (S10-T02)
-prometheus-fastapi-instrumentator==8.0.2  # /metrics Prometheus (S21-T05)
+prometheus-fastapi-instrumentator==8.1.0  # /metrics Prometheus (S21-T05)
 sqlalchemy==2.0.51
 greenlet==3.5.4  # exigido pelo modo async do SQLAlchemy (S24-T01)
 alembic==1.18.5
