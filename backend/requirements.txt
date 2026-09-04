@@ -8,17 +8,17 @@
 # Conjunto validado: 294 testes, cobertura 96%.
 
 # --- Runtime ---
-fastapi==0.139.2
-uvicorn==0.51.0
+fastapi==0.141.1
+uvicorn==0.52.4
 python-multipart==0.0.32  # para multipart/form-data (upload de CSV em S09)
 slowapi==0.1.10  # rate limiting (S10-T02)
-prometheus-fastapi-instrumentator==8.0.2  # /metrics Prometheus (S21-T05)
-sqlalchemy==2.0.51
-greenlet==3.5.4  # exigido pelo modo async do SQLAlchemy (S24-T01)
-alembic==1.18.5
-psycopg[binary]==3.3.4  # suporta driver async (postgresql+psycopg) usado pelo AsyncEngine
-pydantic==2.13.4
-pydantic-settings==2.14.2
+prometheus-fastapi-instrumentator==8.1.0  # /metrics Prometheus (S21-T05)
+sqlalchemy==2.0.52
+greenlet==3.5.5  # exigido pelo modo async do SQLAlchemy (S24-T01)
+alembic==1.19.1
+psycopg[binary]==3.3.5  # suporta driver async (postgresql+psycopg) usado pelo AsyncEngine
+pydantic==2.13.5
+pydantic-settings==2.15.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1  # passlib 1.7.4 quebra com bcrypt >= 4.1 (sem .__about__)
 python-jose==3.5.0
@@ -32,7 +32,7 @@ aiosqlite==0.22.1  # driver SQLite async para a suite de testes (S24-T01)
 requests==2.34.2  # usado por scripts/smoke_prod.py (S16-T06)
 
 # --- Lint / Format ---
-ruff==0.16.0
+ruff==0.16.5
 black==26.5.1
 
 # --- Segurança (CI) ---
