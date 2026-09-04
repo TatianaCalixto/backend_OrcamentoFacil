@@ -7,8 +7,8 @@
 # continua propondo as atualizações; o pin só garante que todo mundo instale
 # exatamente o mesmo conjunto. Conjunto validado: 45 testes do painel passando.
 
-streamlit==1.60.0
+streamlit==1.62.0
 requests==2.34.2
 pandas==3.0.5
-plotly==6.9.0
+plotly==7.0.0
 openpyxl==3.1.5  # exportação XLSX
