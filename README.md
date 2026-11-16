@@ -14,9 +14,14 @@ sprints**: a documentação define o *quê* e os critérios de pronto, e a
 implementação avança sprint a sprint, com **testes obrigatórios** e
 **rastreabilidade** de cada módulo até a sprint que o originou.
 
-Estes projetos são desenvolvidos em **parceria com IA**: a arquitetura, os critérios
-e a documentação são definidos por mim; a IA executa sob essa direção, sprint a
-sprint. O método importa mais que a ferramenta.
+O projeto foi desenvolvido com **apoio de IA generativa**, seguindo um processo
+organizado por requisitos, regras de negócio, documentação, tarefas e critérios de
+validação.
+
+Minha atuação envolve estruturar as necessidades do projeto, organizar e acompanhar
+as etapas de implementação, realizar testes, investigar problemas e validar as
+entregas. As ferramentas de IA auxiliam na implementação e também na análise de
+alternativas técnicas.
 
 O detalhamento da metodologia e o plano operacional completo ficam fora deste
 repositório.
@@ -244,7 +249,7 @@ backend/
 │   ├── dashboard/             # 3 endpoints de agregação
 │   └── imports/               # CSV: parser + service + router
 ├── alembic/                   # migrations
-├── tests/                     # pytest (220+ testes)
+├── tests/                     # pytest (290+ testes)
 ├── Dockerfile                 # produção
 ├── pytest.ini
 ├── pyproject.toml             # ruff + black + coverage
@@ -266,7 +271,6 @@ panel/
 | `connection refused` ao psql | Postgres ainda subindo | `docker compose ps` e esperar `healthy` |
 | `pip install` falha por SSL no Windows | Certificados desatualizados | `python -m pip install --upgrade pip certifi` |
 | Porta 5432 já ocupada por outro Postgres do host | Conflito de porta | Mudar `POSTGRES_PORT` no `.env` (ex.: `POSTGRES_PORT=5433`) |
-| Push GitHub dá 403 | Credencial cacheada de outra conta | Apagar `git:https://github.com` no Windows Credential Manager e refazer o push |
 | `alembic upgrade head` falha com "type X already exists" | Volume Postgres tem ENUM órfão de testes anteriores | `docker compose down -v` reseta o volume |
 | `bcrypt` quebra com erro `__about__` | bcrypt >= 4.1 incompatível com passlib 1.7.4 | Pin `bcrypt>=4.0,<4.1` (já no requirements.txt) |
 | Rate limit 429 em desenvolvimento | Default de 10/min em /auth/* | Esperar o reset (1 minuto) ou rodar via test que reseta entre testes |
@@ -289,26 +293,11 @@ panel/
 
 ## Status do projeto
 
-**MVP completo** em 1 dia (2026-05-23 → 2026-05-24, 17 sprints planejadas).
+MVP concluído, seguido de fases de melhoria de UX, endurecimento técnico (auditoria
+de dependências no CI, rate limiting, refresh token revogável, headers de segurança)
+e qualidade de código (backend assíncrono, schemas sem duplicação, camada de
+services no painel). A suíte tem 290+ testes, com ~96% de cobertura.
 
-| Sprint | Conteúdo | Status |
-|---|---|---|
-| 0 | Setup + CI + Docker | ✓ |
-| 1 | FastAPI core + Alembic + logging | ✓ |
-| 2 | Auth JWT + /users/me | ✓ |
-| 3 | CRUD Accounts | ✓ |
-| 4 | CRUD Categories + seed | ✓ |
-| 5 | CRUD Transactions + regra de saldo + regressão | ✓ |
-| 6 | Budgets mensais com status | ✓ |
-| 7 | Goals com status auto | ✓ |
-| 8 | Dashboard backend (3 endpoints) | ✓ |
-| 9 | Import CSV | ✓ |
-| 10 | Hardening (CORS, rate limit, refresh, OpenAPI, cov 80%) | ✓ |
-| 11 | Flutter setup + auth | ✓ |
-| 12 | Flutter dashboard + transactions | ✓ |
-| 13 | Flutter categorias/orçamento/metas | ⚠ em andamento (agente paralelo) |
-| 14 | Flutter perfil + import CSV | ⚠ em andamento (agente paralelo) |
-| 15 | Painel Streamlit | ✓ |
-| 16 | Deploy + docs final | ✓ T01/T05/T06; ⚠ T02/T03/T04 bloqueados (IMP-001/002/003) |
-
-O plano completo e a planilha operacional ficam fora do repositório.
+O projeto roda em ambiente local; o deploy em nuvem ainda não foi realizado.
+O histórico das fases está em
+[metodologia_OrcamentoFacil](https://github.com/TatianaCalixto/metodologia_OrcamentoFacil).
