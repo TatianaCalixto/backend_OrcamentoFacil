@@ -54,7 +54,15 @@ st.subheader("Contas")
 if summary["contas"]:
     contas_df = pd.DataFrame(summary["contas"])
     contas_df["current_balance"] = contas_df["current_balance"].astype(float)
-    st.dataframe(contas_df, use_container_width=True, hide_index=True)
+    st.dataframe(
+        contas_df[["name", "current_balance"]],
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "name": st.column_config.TextColumn("Conta"),
+            "current_balance": st.column_config.NumberColumn("Saldo atual", format="R$ %.2f"),
+        },
+    )
 else:
     st.info("Nenhuma conta cadastrada.")
 
@@ -74,9 +82,18 @@ else:
             color="name",
             color_discrete_map=dict(zip(bd_df["name"], bd_df["color"], strict=False)),
             hole=0.4,
+            labels={"name": "Categoria", "total": "Total"},
         )
         st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(bd_df[["name", "total"]], use_container_width=True, hide_index=True)
+        st.dataframe(
+            bd_df[["name", "total"]],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "name": st.column_config.TextColumn("Categoria"),
+                "total": st.column_config.NumberColumn("Total", format="R$ %.2f"),
+            },
+        )
     else:
         st.info("Sem despesas no mes selecionado.")
 
@@ -107,8 +124,21 @@ else:
                 cf_df, x="date", y="saldo_acumulado",
                 title="Saldo acumulado no periodo",
                 markers=True,
+                labels={"date": "Data", "saldo_acumulado": "Saldo acumulado (R$)"},
             )
             st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(cf_df, use_container_width=True, hide_index=True)
+            st.dataframe(
+                cf_df[["date", "receita", "despesa", "saldo_acumulado"]],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "date": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
+                    "receita": st.column_config.NumberColumn("Receita", format="R$ %.2f"),
+                    "despesa": st.column_config.NumberColumn("Despesa", format="R$ %.2f"),
+                    "saldo_acumulado": st.column_config.NumberColumn(
+                        "Saldo acumulado", format="R$ %.2f"
+                    ),
+                },
+            )
         else:
             st.info("Sem movimentacoes no periodo selecionado.")
