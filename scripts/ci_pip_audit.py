@@ -51,6 +51,15 @@ ALLOWLIST: dict[str, str] = {
         "vulneravel nunca e exercitado. Sem fix version publicada pelo "
         "upstream. Revisar se o projeto passar a usar ES256/RS256."
     ),
+    "PYSEC-2026-4298": (
+        "python-jose (algorithm confusion com chave publica DER): exige que o "
+        "servico use uma chave publica assimetrica como segredo HMAC e nao "
+        "restrinja os algoritmos aceitos. O OrcaFacil usa JWT_SECRET textual "
+        "e decodifica com algorithms=[jwt_algorithm] (app/auth/jwt.py), "
+        "portanto o caminho vulneravel nao e alcancavel. Sem fix version "
+        "publicada pelo upstream. Revisar se o projeto passar a usar chaves "
+        "assimetricas ou migrar para PyJWT."
+    ),
 }
 
 
